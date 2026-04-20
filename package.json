@@ -1,0 +1,28 @@
+{
+  "name": "callbot-generator-v2",
+  "version": "1.0.0",
+  "description": "Générateur de callbots modulaire - template driven",
+  "main": "generator.js",
+  "scripts": {
+    "dev": "node generator.js",
+    "build": "echo 'Static site - no build needed'",
+    "deploy": "node scripts/deploy-to-vapi.js"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "axios": "^1.6.0",
+    "fs-extra": "^11.0.0",
+    "handlebars": "^4.7.8",
+    "inquirer": "^9.0.0",
+    "puppeteer": "^24.41.0"
+  },
+  "keywords": [
+    "callbot",
+    "vapi",
+    "ai",
+    "voice",
+    "template"
+  ],
+  "author": "Mal - OpenClaw",
+  "license": "MIT"
+}

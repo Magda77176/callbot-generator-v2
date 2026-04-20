@@ -1,0 +1,195 @@
+{
+  "metadata": {
+    "id": "coiffeur",
+    "name": "Salon de Coiffure & Beauté",
+    "template_id": "coiffeur",
+    "template_name": "Salon de Coiffure & Beauté",
+    "version": "1.0",
+    "created": "2026-04-17",
+    "description": "CallBot pour salons de coiffure, barbiers, instituts de beauté - prise de RDV, conseils, tarifs",
+    "category": "beaute",
+    "target_audience": "Salons de coiffure, barbiers, instituts de beauté, spas"
+  },
+  "conversation": {
+    "name": "Léa",
+    "role": "Assistante salon de coiffure",
+    "personality": "Stylée et bienveillante",
+    "objective": "Prendre des rendez-vous et conseiller les clients",
+    "steps": [
+      {
+        "name": "accueil",
+        "description": "Accueille le client chaleureusement",
+        "prompt": "Bonjour ! Je suis {{bot.name}}, l'assistante du salon {{business.name}}. Je peux vous aider à prendre rendez-vous, vous renseigner sur nos services ou nos tarifs."
+      },
+      {
+        "name": "identification_besoin",
+        "description": "Détermine le type de demande",
+        "prompt": "Que puis-je faire pour vous ?"
+      },
+      {
+        "name": "prise_rdv",
+        "description": "Collecte les informations pour le rendez-vous",
+        "prompt": "Quel service vous intéresse ? Coupe, coloration, brushing ? Pour quelle date ?"
+      },
+      {
+        "name": "confirmation",
+        "description": "Confirme le rendez-vous",
+        "prompt": "Parfait ! Je note votre rendez-vous. Notre salon se trouve {{business.address}}, ouverts {{hours}}."
+      }
+    ]
+  },
+  "bot_config": {
+    "name": "Léa",
+    "personality": "Stylée, bienveillante, experte beauté",
+    "voice_tone": "Professionnel et chaleureux",
+    "language": "fr-FR",
+    "context_variables": {
+      "salon_name": "{{salon_name}}",
+      "services_proposes": "{{services_proposes}}",
+      "coiffeurs_equipe": "{{coiffeurs_equipe}}",
+      "horaires_ouverture": "{{horaires_ouverture}}",
+      "telephone": "{{telephone}}",
+      "adresse": "{{adresse}}",
+      "site_web": "{{site_web}}",
+      "tarifs_base": "{{tarifs_base}}",
+      "specialites": "{{specialites}}",
+      "produits_utilises": "{{produits_utilises}}",
+      "parking": "{{parking}}",
+      "carte_fidelite": "{{carte_fidelite}}"
+    }
+  },
+  "conversation_flows": {
+    "greeting": {
+      "message": "Bonjour ! Je suis Léa, l'assistante du salon {{salon_name}}. Je peux vous aider à prendre rendez-vous, vous renseigner sur nos services ou nos tarifs. Comment puis-je vous aider ?",
+      "next_actions": ["prise_rdv", "info_services", "info_tarifs", "conseil_beaute"]
+    },
+    "prise_rdv": {
+      "trigger_keywords": ["rendez-vous", "rdv", "réserver", "coupe", "coloration"],
+      "questions": [
+        {
+          "field": "type_prestation",
+          "question": "Quel service vous intéresse ? Nous proposons : {{services_proposes}}",
+          "validation": "required"
+        },
+        {
+          "field": "coiffeur_preference",
+          "question": "Avez-vous une préférence pour un coiffeur ? Notre équipe : {{coiffeurs_equipe}}",
+          "validation": "optional"
+        },
+        {
+          "field": "date_souhaitee",
+          "question": "Pour quelle date souhaitez-vous votre rendez-vous ?",
+          "validation": "date_future"
+        },
+        {
+          "field": "creneau_prefere",
+          "question": "Préférez-vous le matin, l'après-midi ou en soirée ? Nous sommes ouverts {{horaires_ouverture}}",
+          "validation": "required"
+        },
+        {
+          "field": "nom_client",
+          "question": "À quel nom puis-je prendre ce rendez-vous ?",
+          "validation": "required"
+        },
+        {
+          "field": "telephone_client",
+          "question": "Votre numéro de téléphone ?",
+          "validation": "phone"
+        },
+        {
+          "field": "premiere_visite",
+          "question": "Est-ce votre première visite chez nous ?",
+          "options": ["Oui", "Non"],
+          "validation": "required"
+        }
+      ],
+      "conditional": {
+        "if": "premiere_visite == 'Oui'",
+        "then": {
+          "field": "type_cheveux",
+          "question": "Parfait ! Pour mieux vous conseiller, pouvez-vous me décrire vos cheveux ? (longueur, texture, couleur actuelle...)",
+          "validation": "optional"
+        }
+      },
+      "confirmation": "Rendez-vous pré-réservé pour {{type_prestation}} le {{date_souhaitee}} {{creneau_prefere}} au nom de {{nom_client}}. Notre équipe vous rappellera au {{telephone_client}} pour confirmer le créneau exact. Tarif estimé : {{tarifs_base}}."
+    },
+    "info_services": {
+      "trigger_keywords": ["services", "prestations", "que faites-vous", "spécialités"],
+      "response": "Chez {{salon_name}}, nous proposons : {{services_proposes}}. Nos spécialités : {{specialites}}. Nous utilisons les produits {{produits_utilises}}. Quelle prestation vous intéresse ?"
+    },
+    "info_tarifs": {
+      "trigger_keywords": ["prix", "tarifs", "coût", "combien"],
+      "response": "Nos tarifs de base : {{tarifs_base}}. {{carte_fidelite ? 'Nous avons une carte de fidélité avec réductions !' : ''}} Pour un devis personnalisé selon votre prestation, je peux vous mettre en contact avec notre équipe."
+    },
+    "conseil_beaute": {
+      "trigger_keywords": ["conseil", "que me conseillez", "cheveux abîmés", "couleur"],
+      "response": "Nos experts adorent conseiller ! Selon votre type de cheveux et vos envies, nous pouvons vous orienter. Nos spécialités {{specialites}} pourraient vous intéresser. Souhaitez-vous prendre rendez-vous pour un diagnostic gratuit ?"
+    }
+  },
+  "objection_handling": {
+    "pas_de_creneau": "Je comprends. Puis-je vous proposer d'autres dates ? Ou vous mettre sur notre liste de rappel en cas de désistement ?",
+    "trop_cher": "Nous avons différentes prestations et nos tarifs varient. Quel est votre budget ? {{carte_fidelite ? 'Notre carte fidélité offre aussi des réductions.' : ''}}",
+    "jamais_venu": "Parfait ! Première visite = diagnostic offert pour vous conseiller au mieux. Nos {{specialites}} pourraient vous plaire !",
+    "coiffeur_absent": "Pas de souci ! {{coiffeur_preference}} n'est pas disponible ? Notre équipe est polyvalente : {{coiffeurs_equipe}}. Qui souhaitez-vous comme alternative ?"
+  },
+  "data_collection": {
+    "required_fields": [
+      "nom_client",
+      "telephone_client",
+      "type_prestation"
+    ],
+    "optional_fields": [
+      "email_client",
+      "type_cheveux",
+      "allergies",
+      "historique_colorations",
+      "source_decouverte"
+    ]
+  },
+  "integration_webhooks": {
+    "appointment_webhook": {
+      "url": "{{webhook_base_url}}/salon/appointment",
+      "trigger": "rdv_complete",
+      "data_mapping": {
+        "customer_name": "{{nom_client}}",
+        "customer_phone": "{{telephone_client}}",
+        "service_type": "{{type_prestation}}",
+        "preferred_stylist": "{{coiffeur_preference}}",
+        "appointment_date": "{{date_souhaitee}}",
+        "time_preference": "{{creneau_prefere}}",
+        "first_visit": "{{premiere_visite}}",
+        "hair_type": "{{type_cheveux}}",
+        "salon_id": "{{salon_id}}"
+      }
+    }
+  },
+  "context_enrichment": {
+    "web_scraping": {
+      "enabled": true,
+      "sources": [
+        {
+          "type": "website", 
+          "url": "{{site_web}}",
+          "extract": ["services", "tarifs", "equipe", "galerie_photos"]
+        },
+        {
+          "type": "social_media",
+          "platforms": ["instagram", "facebook"],
+          "search": "{{salon_name}}",
+          "extract": ["realisations_photos", "avis_clients", "tendances"]
+        },
+        {
+          "type": "google_business",
+          "search": "{{salon_name}} {{adresse}}",
+          "extract": ["avis", "photos", "horaires_google"]
+        }
+      ]
+    },
+    "knowledge_base": {
+      "tendances_actuelles": "{{tendances_coiffure}}",
+      "conseils_saison": "{{conseils_saison}}",
+      "produits_recommandes": "{{produits_recommandes}}",
+      "techniques_specialisees": "{{techniques_specialisees}}"
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "id": "immobilier",
+    "name": "Agence Immobilière", 
+    "version": "1.0.0",
+    "description": "Callbot pour agences immobilières - qualification prospects et prise de RDV"
+  },
+  "bot": {
+    "name": "Sophie",
+    "role": "Assistante commerciale immobilier",
+    "greeting": "Bonjour! Je suis Sophie, votre assistante pour vos projets immobiliers. En quoi puis-je vous aider ?",
+    "tone": "commercial et chaleureux",
+    "voice": {
+      "provider": "google",
+      "language": "fr-FR", 
+      "gender": "female",
+      "speed": 1.0
+    }
+  },
+  "flow": {
+    "steps": ["accueil", "qualification", "besoin", "collecte", "confirmation"],
+    "maxDuration": 720,
+    "timeoutPerStep": [20, 45, 30, 45, 30]
+  },
+  "services": [
+    {
+      "id": "estimation",
+      "name": "Estimation gratuite",
+      "price": 0,
+      "currency": "EUR",
+      "duration": 30,
+      "description": "Estimation de votre bien immobilier"
+    },
+    {
+      "id": "visite_vente",
+      "name": "Visite pour vente", 
+      "price": 0,
+      "currency": "EUR",
+      "duration": 60,
+      "description": "Visite de votre bien à vendre"
+    },
+    {
+      "id": "recherche_achat",
+      "name": "Recherche d'achat",
+      "price": 0,
+      "currency": "EUR", 
+      "duration": 45,
+      "description": "Accompagnement recherche bien à acheter"
+    },
+    {
+      "id": "conseil",
+      "name": "Conseil investissement",
+      "price": 150,
+      "currency": "EUR",
+      "duration": 90,
+      "description": "Conseil pour investissement immobilier"
+    }
+  ],
+  "emergency": {
+    "enabled": false
+  },
+  "qualifying_questions": [
+    "Recherchez-vous à acheter ou vendre ?",
+    "Dans quelle zone géographique ?", 
+    "Quel est votre budget approximatif ?",
+    "Dans quels délais ?"
+  ],
+  "required_fields": [
+    {
+      "name": "firstName",
+      "question": "Quel est votre prénom ?",
+      "validation": "required"
+    },
+    {
+      "name": "lastName",
+      "question": "Et votre nom ?",
+      "validation": "required" 
+    },
+    {
+      "name": "phoneNumber",
+      "question": "Votre téléphone ?",
+      "validation": "phone"
+    },
+    {
+      "name": "projectType",
+      "question": "Achat ou vente ?",
+      "validation": "required",
+      "options": ["achat", "vente", "investissement"]
+    },
+    {
+      "name": "budget",
+      "question": "Quel budget ?",
+      "validation": "number"
+    },
+    {
+      "name": "zone",
+      "question": "Dans quelle zone ?", 
+      "validation": "required"
+    },
+    {
+      "name": "appointmentDate",
+      "question": "Quelle date pour un rendez-vous ?",
+      "validation": "future_date"
+    }
+  ],
+  "conversation": {
+    "confirmation_template": "Je récapitule: {{firstName}} {{lastName}}, projet {{projectType}} budget {{budget}}€ zone {{zone}}, rendez-vous le {{appointmentDate}}. Téléphone: {{phoneNumber}}. Confirmez-vous ?",
+    "goodbye_message": "Parfait ! Nous vous recontactons rapidement."
+  },
+  "vapi": {
+    "model": "gpt-4o-mini",
+    "temperature": 0.4,
+    "maxTokens": 180
+  }
+}

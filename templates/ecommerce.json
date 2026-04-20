@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "id": "ecommerce",
+    "name": "Support E-commerce",
+    "version": "1.0.0", 
+    "description": "Callbot pour SAV e-commerce - suivi commandes et support client"
+  },
+  "bot": {
+    "name": "Alex",
+    "role": "Assistant support client",
+    "greeting": "Bonjour! Je suis Alex, votre assistant support. Comment puis-je vous aider avec votre commande ?",
+    "tone": "professionnel et résolutif",
+    "voice": {
+      "provider": "google",
+      "language": "fr-FR",
+      "gender": "male", 
+      "speed": 1.0
+    }
+  },
+  "flow": {
+    "steps": ["accueil", "identification", "probleme", "resolution", "confirmation"],
+    "maxDuration": 600,
+    "timeoutPerStep": [15, 30, 60, 45, 20]
+  },
+  "services": [
+    {
+      "id": "suivi_commande",
+      "name": "Suivi de commande",
+      "price": 0,
+      "currency": "EUR",
+      "duration": 15,
+      "description": "Vérification statut de votre commande"
+    },
+    {
+      "id": "retour_produit",
+      "name": "Retour/Échange", 
+      "price": 0,
+      "currency": "EUR",
+      "duration": 30,
+      "description": "Procédure de retour ou échange"
+    },
+    {
+      "id": "remboursement",
+      "name": "Demande remboursement",
+      "price": 0,
+      "currency": "EUR",
+      "duration": 45,
+      "description": "Traitement demande de remboursement"
+    },
+    {
+      "id": "probleme_technique",
+      "name": "Problème technique",
+      "price": 0,
+      "currency": "EUR", 
+      "duration": 60,
+      "description": "Assistance technique produit"
+    }
+  ],
+  "emergency": {
+    "enabled": false
+  },
+  "problem_types": [
+    "Commande non reçue",
+    "Produit défectueux", 
+    "Mauvaise taille",
+    "Remboursement",
+    "Problème de livraison",
+    "Question technique"
+  ],
+  "required_fields": [
+    {
+      "name": "firstName",
+      "question": "Votre prénom ?",
+      "validation": "required"
+    },
+    {
+      "name": "email", 
+      "question": "Votre email de commande ?",
+      "validation": "email"
+    },
+    {
+      "name": "orderNumber",
+      "question": "Numéro de commande ?",
+      "validation": "required"
+    },
+    {
+      "name": "problemType",
+      "question": "Quel est le problème ?",
+      "validation": "required"
+    },
+    {
+      "name": "phoneNumber",
+      "question": "Téléphone pour vous recontacter ?",
+      "validation": "phone"
+    }
+  ],
+  "conversation": {
+    "confirmation_template": "Dossier: {{firstName}}, email {{email}}, commande {{orderNumber}}, problème: {{problemType}}. Nous vous recontactons au {{phoneNumber}}. C'est bon ?",
+    "goodbye_message": "Votre demande est enregistrée. Nous vous recontactons sous 24h."
+  },
+  "resolution_actions": [
+    "check_order_status",
+    "initiate_return", 
+    "process_refund",
+    "transfer_to_human",
+    "send_instructions"
+  ],
+  "vapi": {
+    "model": "gpt-4o-mini",
+    "temperature": 0.2,
+    "maxTokens": 120
+  }
+}

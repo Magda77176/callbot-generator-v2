@@ -1,0 +1,234 @@
+{
+  "metadata": {
+    "id": "restaurant",
+    "name": "Restaurant & Café",
+    "template_id": "restaurant",
+    "template_name": "Restaurant & Café",
+    "version": "1.0",
+    "created": "2026-04-17",
+    "description": "CallBot pour restaurants, pizzerias, cafés - réservations, commandes à emporter, infos menu",
+    "category": "restaurant",
+    "target_audience": "Restaurants, pizzerias, cafés, traiteurs"
+  },
+  "conversation": {
+    "name": "Marco",
+    "role": "Assistant restaurant",
+    "personality": "Chaleureux et efficace",
+    "objective": "Gérer les réservations et commandes à emporter",
+    "steps": [
+      {
+        "name": "accueil",
+        "description": "Accueille le client et identifie son besoin",
+        "prompt": "Bonjour ! Je suis {{bot.name}}, l'assistant de {{business.name}}. Je peux vous aider pour une réservation, une commande à emporter ou vous renseigner sur notre carte."
+      },
+      {
+        "name": "identification_besoin",
+        "description": "Détermine si c'est réservation, commande ou renseignement",
+        "prompt": "Que puis-je faire pour vous aujourd'hui ?"
+      },
+      {
+        "name": "traitement_reservation",
+        "description": "Prend les informations pour la réservation",
+        "prompt": "Parfait ! Pour quelle date et à quelle heure souhaitez-vous réserver ? Pour combien de personnes ?"
+      },
+      {
+        "name": "traitement_commande",
+        "description": "Prend la commande à emporter",
+        "prompt": "Très bien ! Que souhaitez-vous commander ? Nos spécialités sont : {{specialties}}"
+      },
+      {
+        "name": "confirmation",
+        "description": "Confirme la demande et donne les informations pratiques",
+        "prompt": "Parfait ! Je confirme votre demande. Notre restaurant se trouve {{business.address}} et nous sommes ouverts {{hours}}."
+      }
+    ]
+  },
+  "bot_config": {
+    "name": "Marco",
+    "personality": "Chaleureux, gourmand, efficace",
+    "voice_tone": "Accueillant et professionnel",
+    "language": "fr-FR",
+    "context_variables": {
+      "restaurant_name": "{{restaurant_name}}",
+      "cuisine_type": "{{cuisine_type}}",
+      "specialites": "{{specialites}}",
+      "horaires_ouverture": "{{horaires_ouverture}}",
+      "telephone": "{{telephone}}",
+      "adresse": "{{adresse}}",
+      "site_web": "{{site_web}}",
+      "menu_url": "{{menu_url}}",
+      "prix_moyen": "{{prix_moyen}}",
+      "capacite_places": "{{capacite_places}}",
+      "livraison_disponible": "{{livraison_disponible}}",
+      "terrasse": "{{terrasse}}",
+      "parking": "{{parking}}"
+    }
+  },
+  "conversation_flows": {
+    "greeting": {
+      "message": "Bonjour ! Je suis Marco, l'assistant de {{restaurant_name}}. Je peux vous aider pour une réservation, une commande à emporter ou vous renseigner sur notre carte. Comment puis-je vous aider ?",
+      "next_actions": ["reservation", "commande_emporter", "infos_menu", "infos_pratiques"]
+    },
+    "reservation": {
+      "trigger_keywords": ["réservation", "réserver", "table", "place"],
+      "questions": [
+        {
+          "field": "date_reservation",
+          "question": "Parfait ! Pour quelle date souhaitez-vous réserver ?",
+          "validation": "date_future"
+        },
+        {
+          "field": "heure_reservation", 
+          "question": "À quelle heure ? Nous servons de {{horaires_ouverture}}.",
+          "validation": "heure_ouverture"
+        },
+        {
+          "field": "nombre_personnes",
+          "question": "Pour combien de personnes ?",
+          "validation": "number_positive"
+        },
+        {
+          "field": "nom_client",
+          "question": "Au nom de qui puis-je faire la réservation ?",
+          "validation": "required"
+        },
+        {
+          "field": "telephone_client",
+          "question": "Quel est votre numéro de téléphone ?",
+          "validation": "phone"
+        },
+        {
+          "field": "demandes_speciales",
+          "question": "Avez-vous des demandes particulières ? (allergie, anniversaire, terrasse...)",
+          "validation": "optional"
+        }
+      ],
+      "confirmation": "Parfait ! Réservation confirmée pour {{nombre_personnes}} personnes le {{date_reservation}} à {{heure_reservation}} au nom de {{nom_client}}. Nous vous attendons chez {{restaurant_name}} ! Si besoin, appelez-nous au {{telephone}}."
+    },
+    "commande_emporter": {
+      "trigger_keywords": ["emporter", "à emporter", "commande", "livraison"],
+      "questions": [
+        {
+          "field": "type_commande",
+          "question": "Vous souhaitez commander à emporter ou en livraison ?",
+          "options": ["À emporter", "Livraison"],
+          "validation": "required"
+        },
+        {
+          "field": "menu_choix",
+          "question": "Que souhaitez-vous commander ? Je peux vous présenter nos spécialités : {{specialites}}. Notre carte complète est sur {{menu_url}}",
+          "validation": "required"
+        },
+        {
+          "field": "heure_recuperation",
+          "question": "Pour quelle heure souhaitez-vous {{type_commande}} ?",
+          "validation": "heure_future"
+        },
+        {
+          "field": "nom_client",
+          "question": "Au nom de qui est la commande ?",
+          "validation": "required"
+        },
+        {
+          "field": "telephone_client",
+          "question": "Votre numéro de téléphone ?",
+          "validation": "phone"
+        }
+      ],
+      "conditional": {
+        "if": "type_commande == 'Livraison'",
+        "then": {
+          "field": "adresse_livraison",
+          "question": "Quelle est l'adresse de livraison ?",
+          "validation": "required"
+        }
+      },
+      "confirmation": "Commande enregistrée ! {{menu_choix}} pour {{heure_recuperation}} au nom de {{nom_client}}. Total estimé avec nos prix moyens : {{prix_moyen}}. Confirmation définitive au {{telephone}}."
+    },
+    "infos_menu": {
+      "trigger_keywords": ["menu", "carte", "plats", "spécialités", "prix"],
+      "response": "Nous proposons une cuisine {{cuisine_type}} avec nos spécialités : {{specialites}}. Prix moyen : {{prix_moyen}}. Consultez notre carte complète sur {{menu_url}} ou je peux vous en parler. Qu'est-ce qui vous intéresse ?"
+    },
+    "infos_pratiques": {
+      "trigger_keywords": ["horaires", "adresse", "où", "téléphone", "parking"],
+      "response": "{{restaurant_name}} se trouve {{adresse}}. Ouvert {{horaires_ouverture}}. {{parking ? 'Parking disponible.' : ''}} {{terrasse ? 'Nous avons une terrasse.' : ''}} Téléphone : {{telephone}}. Site web : {{site_web}}"
+    }
+  },
+  "objection_handling": {
+    "plus_de_place": "Je comprends. Puis-je vous proposer un autre créneau ? Ou vous mettre sur liste d'attente ?",
+    "trop_cher": "Nous avons différents menus à tous les prix. Quel est votre budget approximatif ?",
+    "allergie": "Pas de problème, notre chef peut s'adapter. De quelle allergie s'agit-il ?",
+    "groupe_important": "Pour les groupes de plus de {{capacite_places}} personnes, je vous mets en contact direct avec notre responsable au {{telephone}}."
+  },
+  "data_collection": {
+    "required_fields": [
+      "nom_client",
+      "telephone_client", 
+      "type_demande"
+    ],
+    "optional_fields": [
+      "email_client",
+      "demandes_speciales",
+      "anniversaire",
+      "source_decouverte"
+    ]
+  },
+  "integration_webhooks": {
+    "reservation_webhook": {
+      "url": "{{webhook_base_url}}/restaurant/reservation",
+      "trigger": "reservation_complete",
+      "data_mapping": {
+        "customer_name": "{{nom_client}}",
+        "customer_phone": "{{telephone_client}}",
+        "reservation_date": "{{date_reservation}}",
+        "reservation_time": "{{heure_reservation}}",
+        "party_size": "{{nombre_personnes}}",
+        "special_requests": "{{demandes_speciales}}",
+        "restaurant_id": "{{restaurant_id}}"
+      }
+    },
+    "takeaway_webhook": {
+      "url": "{{webhook_base_url}}/restaurant/takeaway",
+      "trigger": "commande_complete",
+      "data_mapping": {
+        "customer_name": "{{nom_client}}",
+        "customer_phone": "{{telephone_client}}",
+        "order_type": "{{type_commande}}",
+        "order_details": "{{menu_choix}}",
+        "pickup_time": "{{heure_recuperation}}",
+        "delivery_address": "{{adresse_livraison}}",
+        "restaurant_id": "{{restaurant_id}}"
+      }
+    }
+  },
+  "context_enrichment": {
+    "web_scraping": {
+      "enabled": true,
+      "sources": [
+        {
+          "type": "website",
+          "url": "{{site_web}}",
+          "extract": ["menu", "horaires", "specialites", "photos"]
+        },
+        {
+          "type": "google_business",
+          "search": "{{restaurant_name}} {{adresse}}",
+          "extract": ["avis", "photos", "horaires_google"]
+        },
+        {
+          "type": "social_media",
+          "platforms": ["facebook", "instagram"],
+          "search": "{{restaurant_name}}",
+          "extract": ["derniers_posts", "photos_plats", "evenements"]
+        }
+      ]
+    },
+    "knowledge_base": {
+      "restaurant_specifics": "{{restaurant_description}}",
+      "chef_info": "{{chef_info}}",
+      "histoire_restaurant": "{{histoire_restaurant}}",
+      "recompenses": "{{recompenses}}",
+      "evenements_speciaux": "{{evenements_speciaux}}"
+    }
+  }
+}

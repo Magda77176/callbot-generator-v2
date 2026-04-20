@@ -2,6 +2,8 @@
  * API Serverless pour déployer sur Vapi (Vercel) - Version fixée
  */
 
+const WEBHOOK_URL = 'https://webhook.homepop.fr/webhook/vapi';
+
 // Configuration CallBots
 const CALLBOT_CONFIGS = {
   restaurant: {
@@ -186,14 +188,17 @@ async function deployToVapi(config, businessInfo) {
       provider: "deepgram",
       model: "nova-2",
       language: "fr"
+    },
+    server: {
+      url: WEBHOOK_URL,
+      secret: process.env.VAPI_WEBHOOK_SECRET
     }
-    // Webhook désactivé temporairement
   };
 
   const response = await fetch('https://api.vapi.ai/assistant', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.vapiKey}`,
+      'Authorization': `Bearer ${process.env.VAPI_API_KEY}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
@@ -249,29 +254,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!process.env.VAPI_API_KEY || !process.env.VAPI_WEBHOOK_SECRET) {
+    return res.status(500).json({
+      success: false,
+      error: 'Configuration serveur incomplète (env vars manquantes)'
+    });
+  }
+
   try {
-    const { sector, vapiKey, webhookUrl, webhookSecret, businessInfo } = req.body;
+    const { sector, businessInfo } = req.body;
 
     if (!CALLBOT_CONFIGS[sector]) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: `Secteur '${sector}' non supporté. Secteurs disponibles: ${Object.keys(CALLBOT_CONFIGS).join(', ')}` 
+        error: `Secteur '${sector}' non supporté. Secteurs disponibles: ${Object.keys(CALLBOT_CONFIGS).join(', ')}`
       });
     }
 
-    if (!vapiKey || !webhookUrl) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Clé Vapi et URL webhook sont requis' 
-      });
-    }
-
-    const config = {
-      ...CALLBOT_CONFIGS[sector],
-      vapiKey,
-      webhookUrl,
-      webhookSecret: webhookSecret || 'callbot-webhook-secret-2026'
-    };
+    const config = CALLBOT_CONFIGS[sector];
 
     console.log(`🚀 Déploiement CallBot ${sector} pour:`, businessInfo?.name || 'Client');
 
@@ -283,17 +283,15 @@ export default async function handler(req, res) {
       phoneNumber: result.phoneNumber || 'En cours d\'attribution...',
       sector: sector,
       assistantName: config.name,
-      businessName: businessInfo?.name || 'Non défini',
-      webhookConfigured: !!webhookUrl
+      businessName: businessInfo?.name || 'Non défini'
     });
 
   } catch (error) {
     console.error('❌ Erreur déploiement Vapi:', error.message);
-    
+
     return res.status(500).json({
       success: false,
-      error: error.message,
-      details: error.toString()
+      error: error.message
     });
   }
 }

@@ -62,3 +62,11 @@ generated-*/
 # Test files
 test-*.js
 *-test.js
+
+# Next.js
+/.pnp
+*.tsbuildinfo
+next-env.d.ts
+
+# Migration backups
+*.pre-next

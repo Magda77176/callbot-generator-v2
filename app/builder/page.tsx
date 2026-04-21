@@ -11,7 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { CALLBOT_CONFIGS, type Sector } from '@/lib/callbot-configs';
 import type { BuilderState } from '@/lib/builder-types';
-import { DEFAULT_VOICE_ID } from '@/lib/voices';
+import {
+  DEFAULT_VOICE_BY_PERSONA,
+  DEFAULT_VOICE_ID,
+  getVoiceById,
+} from '@/lib/voices';
 
 const STEPS = ['Template', 'Établissement', 'Personnalisation', 'Déploiement'] as const;
 
@@ -20,8 +24,10 @@ const INITIAL_STATE: BuilderState = {
   businessInfo: {},
   systemPrompt: '',
   voiceId: DEFAULT_VOICE_ID,
+  gender: getVoiceById(DEFAULT_VOICE_ID)?.gender ?? 'male',
   model: 'gpt-4o-mini',
   temperature: 0.3,
+  enrichmentStatus: 'idle',
 };
 
 export default function BuilderPage() {
@@ -37,10 +43,14 @@ export default function BuilderPage() {
   })();
 
   const handleSelectSector = (sector: Sector) => {
+    const voiceId = DEFAULT_VOICE_BY_PERSONA[sector];
+    const voice = getVoiceById(voiceId);
     setState((s) => ({
       ...s,
       sector,
       systemPrompt: CALLBOT_CONFIGS[sector].systemPrompt,
+      voiceId,
+      gender: voice?.gender ?? 'male',
     }));
   };
 
@@ -51,7 +61,12 @@ export default function BuilderPage() {
       const res = await fetch('/api/deploy-vapi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sector: state.sector, businessInfo: state.businessInfo }),
+        body: JSON.stringify({
+          sector: state.sector,
+          businessInfo: state.businessInfo,
+          voiceId: state.voiceId,
+          enrichedContext: state.enrichedContext,
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Erreur inconnue');
@@ -97,13 +112,16 @@ export default function BuilderPage() {
         {step === 1 && (
           <StepBusiness
             businessInfo={state.businessInfo}
-            onChange={(businessInfo) => setState((s) => ({ ...s, businessInfo }))}
+            enrichedContext={state.enrichedContext}
+            enrichmentStatus={state.enrichmentStatus ?? 'idle'}
+            onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
         {step === 2 && (
           <StepCustomize
             systemPrompt={state.systemPrompt}
             voiceId={state.voiceId}
+            gender={state.gender}
             model={state.model}
             temperature={state.temperature}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}

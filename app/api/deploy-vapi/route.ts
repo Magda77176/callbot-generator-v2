@@ -47,7 +47,6 @@ async function deployToVapi(
       voiceId,
       model: 'sonic-3',
       language: 'fr',
-      speed: 1.05,
     },
     transcriber: {
       provider: 'deepgram',

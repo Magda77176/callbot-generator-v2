@@ -120,6 +120,28 @@ Pour mettre à jour les prompts :
 
 ---
 
+## Stack technique (v2)
+
+Refonte en cours : migration de l'interface statique vers une app Next.js 15.
+
+- **Framework :** Next.js 15 (App Router) + React 19
+- **UI :** shadcn/ui + Tailwind CSS v4
+- **Test vocal :** Vapi Web SDK (`@vapi-ai/web`)
+- **TypeScript :** strict, pas de `any`
+- **Déploiement :** Vercel (détection Next.js auto)
+
+### Variables d'environnement Vercel
+
+| Variable | Rôle | Côté |
+|---|---|---|
+| `VAPI_API_KEY` | Clé privée Vapi pour déploiement d'assistants | serveur uniquement |
+| `VAPI_WEBHOOK_SECRET` | Secret HMAC pour vérification webhook | serveur uniquement |
+| `VAPI_PUBLIC_KEY` | Clé publique Vapi pour Web Call (test vocal) | exposée au client via route |
+
+**Important :** `VAPI_PUBLIC_KEY` doit être ajoutée aux env vars Vercel avant Release 1.
+
+---
+
 **Développé par :** Sullivan  
 **Contact :** sullivan.magdaleone@gmail.com
 **Version :** 2.0

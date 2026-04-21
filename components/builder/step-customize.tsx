@@ -1,6 +1,7 @@
 'use client';
 
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -11,28 +12,51 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { MODEL_LABELS, type ModelOption } from '@/lib/builder-types';
-import { FRENCH_VOICES } from '@/lib/voices';
+import {
+  CARTESIA_VOICES,
+  getVoiceById,
+  getVoicesByGender,
+  type VoiceGender,
+} from '@/lib/voices';
+
+interface StepCustomizePatch {
+  systemPrompt?: string;
+  voiceId?: string;
+  gender?: VoiceGender;
+  model?: ModelOption;
+  temperature?: number;
+}
 
 interface StepCustomizeProps {
   systemPrompt: string;
   voiceId: string;
+  gender: VoiceGender;
   model: ModelOption;
   temperature: number;
-  onChange: (patch: Partial<{
-    systemPrompt: string;
-    voiceId: string;
-    model: ModelOption;
-    temperature: number;
-  }>) => void;
+  onChange: (patch: StepCustomizePatch) => void;
 }
 
 export function StepCustomize({
   systemPrompt,
   voiceId,
+  gender,
   model,
   temperature,
   onChange,
 }: StepCustomizeProps) {
+  const currentVoice = getVoiceById(voiceId);
+  const filteredVoices = getVoicesByGender(gender);
+
+  const handleGenderChange = (newGender: VoiceGender) => {
+    const firstOfGender = CARTESIA_VOICES.find((v) => v.gender === newGender);
+    if (firstOfGender) onChange({ voiceId: firstOfGender.id, gender: newGender });
+  };
+
+  const handleVoiceChange = (newVoiceId: string) => {
+    const voice = getVoiceById(newVoiceId);
+    if (voice) onChange({ voiceId: newVoiceId, gender: voice.gender });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,24 +84,42 @@ export function StepCustomize({
           </p>
         </TabsContent>
 
-        <TabsContent value="voice" className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="voice">Voix Cartesia (français)</Label>
-            <Select
-              value={voiceId}
-              onValueChange={(v) => v && onChange({ voiceId: v })}
+        <TabsContent value="voice" className="space-y-6 mt-4">
+          <div className="space-y-3">
+            <Label>Genre de la voix</Label>
+            <RadioGroup
+              value={gender}
+              onValueChange={(v) => v && handleGenderChange(v as VoiceGender)}
+              className="flex gap-6"
             >
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="male" />
+                <span className="text-sm">Homme</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="female" />
+                <span className="text-sm">Femme</span>
+              </label>
+            </RadioGroup>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="voice">Voix Cartesia</Label>
+            <Select value={voiceId} onValueChange={(v) => v && handleVoiceChange(v)}>
               <SelectTrigger id="voice" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FRENCH_VOICES.map((v) => (
+                {filteredVoices.map((v) => (
                   <SelectItem key={v.id} value={v.id}>
-                    {v.name} ({v.gender}) — {v.description}
+                    {v.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {currentVoice && (
+              <p className="text-sm text-muted-foreground">{currentVoice.description}</p>
+            )}
           </div>
         </TabsContent>
 

@@ -6,12 +6,16 @@ import {
   type BusinessInfo,
   type CallbotConfig,
 } from '@/lib/callbot-configs';
+import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
 
 const WEBHOOK_URL = 'https://webhook.homepop.fr/webhook/vapi';
+const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
 
 interface DeployRequestBody {
   sector?: string;
   businessInfo?: BusinessInfo;
+  voiceId?: string;
+  enrichedContext?: string;
 }
 
 interface VapiAssistantResponse {
@@ -19,8 +23,13 @@ interface VapiAssistantResponse {
   phoneNumber?: string;
 }
 
-async function deployToVapi(config: CallbotConfig, businessInfo: BusinessInfo): Promise<VapiAssistantResponse> {
-  const systemPrompt = buildPersonalizedPrompt(config, businessInfo);
+async function deployToVapi(
+  config: CallbotConfig,
+  businessInfo: BusinessInfo,
+  voiceId: string,
+  enrichedContext?: string,
+): Promise<VapiAssistantResponse> {
+  const systemPrompt = buildPersonalizedPrompt(config, businessInfo, enrichedContext);
   const businessName = businessInfo.name || 'notre établissement';
 
   const payload = {
@@ -35,9 +44,10 @@ async function deployToVapi(config: CallbotConfig, businessInfo: BusinessInfo): 
     },
     voice: {
       provider: 'cartesia',
-      voiceId: 'a8a1eb38-5f15-4c1d-8722-7ac0f329727d',
-      model: 'sonic-multilingual',
+      voiceId,
+      model: 'sonic-3',
       language: 'fr',
+      speed: 1.05,
     },
     transcriber: {
       provider: 'deepgram',
@@ -48,6 +58,12 @@ async function deployToVapi(config: CallbotConfig, businessInfo: BusinessInfo): 
       url: WEBHOOK_URL,
       secret: process.env.VAPI_WEBHOOK_SECRET,
     },
+    backchannelingEnabled: true,
+    backgroundDenoisingEnabled: true,
+    numWordsToInterruptAssistant: 2,
+    endCallPhrases: END_CALL_PHRASES,
+    silenceTimeoutSeconds: 20,
+    responseDelaySeconds: 0.4,
   };
 
   const response = await fetch('https://api.vapi.ai/assistant', {
@@ -77,7 +93,7 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as DeployRequestBody;
-    const { sector, businessInfo } = body;
+    const { sector, businessInfo, voiceId, enrichedContext } = body;
 
     if (!sector || !isSector(sector)) {
       return NextResponse.json(
@@ -90,7 +106,13 @@ export async function POST(request: Request) {
     }
 
     const config = CALLBOT_CONFIGS[sector];
-    const result = await deployToVapi(config, businessInfo || {});
+    const resolvedVoiceId = voiceId || DEFAULT_VOICE_BY_PERSONA[sector];
+    const result = await deployToVapi(
+      config,
+      businessInfo || {},
+      resolvedVoiceId,
+      enrichedContext,
+    );
 
     return NextResponse.json({
       success: true,

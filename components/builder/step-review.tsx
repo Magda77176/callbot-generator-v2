@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CALLBOT_CONFIGS } from '@/lib/callbot-configs';
 import { MODEL_LABELS, type BuilderState } from '@/lib/builder-types';
-import { FRENCH_VOICES } from '@/lib/voices';
+import { getVoiceById } from '@/lib/voices';
 
 interface StepReviewProps {
   state: BuilderState;
@@ -13,7 +13,11 @@ interface StepReviewProps {
 export function StepReview({ state }: StepReviewProps) {
   if (!state.sector) return null;
   const template = CALLBOT_CONFIGS[state.sector];
-  const voice = FRENCH_VOICES.find((v) => v.id === state.voiceId);
+  const voice = getVoiceById(state.voiceId);
+
+  const contextPreview = state.enrichedContext
+    ? state.enrichedContext.split('\n').filter(Boolean).slice(0, 5).join('\n')
+    : null;
 
   return (
     <div className="space-y-6">
@@ -57,11 +61,16 @@ export function StepReview({ state }: StepReviewProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Voix</CardTitle>
+            <CardTitle className="text-base">Voix choisie</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p>{voice?.name || 'Non définie'}</p>
-            <p className="text-sm text-muted-foreground">{voice?.description}</p>
+          <CardContent className="space-y-2">
+            <p className="font-medium">{voice?.name || 'Non définie'}</p>
+            <Badge variant="secondary">
+              {state.gender === 'male' ? 'Homme' : 'Femme'}
+            </Badge>
+            {voice && (
+              <p className="text-sm text-muted-foreground">{voice.description}</p>
+            )}
           </CardContent>
         </Card>
 
@@ -77,6 +86,20 @@ export function StepReview({ state }: StepReviewProps) {
           </CardContent>
         </Card>
       </div>
+
+      {contextPreview && (
+        <details className="rounded-md border p-4 bg-muted/30">
+          <summary className="cursor-pointer font-medium">
+            Contexte business enrichi (aperçu)
+          </summary>
+          <pre className="mt-3 text-xs whitespace-pre-wrap text-muted-foreground">
+            {contextPreview}
+            {state.enrichedContext && state.enrichedContext.split('\n').filter(Boolean).length > 5
+              ? '\n…'
+              : ''}
+          </pre>
+        </details>
+      )}
 
       <Card>
         <CardHeader>

@@ -22,6 +22,7 @@ const STEPS = ['Template', 'Établissement', 'Personnalisation', 'Déploiement']
 const INITIAL_STATE: BuilderState = {
   sector: null,
   businessInfo: {},
+  primarySource: '',
   systemPrompt: '',
   voiceId: DEFAULT_VOICE_ID,
   gender: getVoiceById(DEFAULT_VOICE_ID)?.gender ?? 'male',
@@ -112,8 +113,10 @@ export default function BuilderPage() {
         {step === 1 && (
           <StepBusiness
             businessInfo={state.businessInfo}
+            primarySource={state.primarySource}
             enrichedContext={state.enrichedContext}
             enrichmentStatus={state.enrichmentStatus ?? 'idle'}
+            detectedType={state.detectedType}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}

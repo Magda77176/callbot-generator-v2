@@ -14,6 +14,7 @@ export const MODEL_LABELS: Record<ModelOption, string> = {
 export interface BuilderState {
   sector: Sector | null;
   businessInfo: BusinessInfo;
+  primarySource: string;
   systemPrompt: string;
   voiceId: string;
   gender: VoiceGender;
@@ -21,4 +22,5 @@ export interface BuilderState {
   temperature: number;
   enrichedContext?: string;
   enrichmentStatus?: EnrichmentStatus;
+  detectedType?: string;
 }

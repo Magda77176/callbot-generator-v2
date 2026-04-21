@@ -5,8 +5,6 @@ export interface BusinessInfo {
   address?: string;
   phone?: string;
   hours?: string;
-  website?: string;
-  gmb_url?: string;
   facebook?: string;
   instagram?: string;
 }
@@ -147,8 +145,6 @@ export function buildPersonalizedPrompt(
     : '';
 
   const onlineLines = [
-    business.gmb_url ? `Google My Business : ${business.gmb_url}` : '',
-    business.website ? `Site web : ${business.website}` : '',
     business.facebook ? `Facebook : ${business.facebook}` : '',
     business.instagram ? `Instagram : ${business.instagram}` : '',
   ]
@@ -167,7 +163,7 @@ Horaires : ${business.hours || "Voir avec l'établissement"}
 ${onlineLines || 'Aucun lien fourni.'}
 
 ## INSTRUCTIONS COMPLÉMENTAIRES
-Mentionne toujours les horaires et l'adresse si on te les demande. Si la personne cherche des avis ou des photos, oriente-la vers la fiche Google My Business. Pour des informations plus détaillées, renvoie vers le site web. Ne dépasse pas quinze à vingt minutes par appel et conclus en confirmant ce qui a été noté.`;
+Mentionne toujours les horaires et l'adresse si on te les demande. Si la personne cherche des avis ou des photos, oriente-la vers ses réseaux. Pour des informations plus détaillées sur l'établissement, appuie-toi sur le contexte business réel ci-dessus. Ne dépasse pas quinze à vingt minutes par appel et conclus en confirmant ce qui a été noté.`;
 
   return contextHeader + basePrompt + businessBlock;
 }

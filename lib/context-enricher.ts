@@ -1,50 +1,48 @@
 import Anthropic from '@anthropic-ai/sdk';
 import * as cheerio from 'cheerio';
+import { searchBusinessByName, type DataForSeoResult } from './dataforseo-client';
+import { detectInputType } from './input-detector';
 
 export interface EnrichmentSources {
-  website?: string;
-  gmb_url?: string;
+  primary: string;
   facebook?: string;
   instagram?: string;
 }
 
 export interface SourceStatus {
-  fetched: boolean;
+  type: string;
+  ok: boolean;
+  details?: string;
   error?: string;
-  chars?: number;
 }
 
 export interface EnrichmentResult {
   success: boolean;
   contextSummary: string;
-  sources: {
-    website?: SourceStatus;
-    gmb?: SourceStatus;
-    facebook?: SourceStatus;
-    instagram?: SourceStatus;
-  };
+  detectedType: string;
+  sourcesStatus: SourceStatus[];
+  dataforseo?: DataForSeoResult;
+  cost?: { dataforseo: number; anthropic: number };
 }
 
-async function scrapeUrl(url: string, maxChars = 15000): Promise<string> {
+async function scrapeViaJina(url: string, maxChars = 12000): Promise<string> {
+  const res = await fetch(`https://r.jina.ai/${url}`, {
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`Jina ${res.status}`);
+  return (await res.text()).slice(0, maxChars);
+}
+
+async function scrapeDirect(url: string, maxChars = 12000): Promise<string> {
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Ottomatisation CallBot Enricher)' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (Ottomatisation Enricher)' },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
   const $ = cheerio.load(html);
   $('script, style, noscript, iframe, nav, footer, header').remove();
-  const text = $('body').text().replace(/\s+/g, ' ').trim();
-  return text.slice(0, maxChars);
-}
-
-async function scrapeViaJina(url: string, maxChars = 15000): Promise<string> {
-  const res = await fetch(`https://r.jina.ai/${url}`, {
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) throw new Error(`Jina HTTP ${res.status}`);
-  const text = await res.text();
-  return text.slice(0, maxChars);
+  return $('body').text().replace(/\s+/g, ' ').trim().slice(0, maxChars);
 }
 
 export async function enrichBusinessContext(
@@ -53,72 +51,149 @@ export async function enrichBusinessContext(
 ): Promise<EnrichmentResult> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
-    return { success: false, contextSummary: '', sources: {} };
+    return {
+      success: false,
+      contextSummary: '',
+      detectedType: 'unknown',
+      sourcesStatus: [],
+    };
   }
 
   const result: EnrichmentResult = {
     success: false,
     contextSummary: '',
-    sources: {},
+    detectedType: 'unknown',
+    sourcesStatus: [],
   };
 
-  const scraped: Record<string, string> = {};
+  const detected = detectInputType(sources.primary);
+  result.detectedType = detected.type;
 
-  if (sources.website) {
+  const scraped: Record<string, string> = {};
+  let dataforseoData: DataForSeoResult | undefined;
+
+  // 1. Nom ou URL Google Maps → DataForSEO GMB lookup
+  if (detected.type === 'business_name' || detected.type === 'google_maps') {
+    const searchTerm = detected.extractedName || businessName || detected.value;
+    if (searchTerm) {
+      dataforseoData = await searchBusinessByName(searchTerm);
+      if (dataforseoData.found && dataforseoData.data) {
+        const d = dataforseoData.data;
+        scraped.dataforseo_gmb = JSON.stringify(
+          {
+            nom: d.title,
+            categorie: d.category,
+            adresse: d.address,
+            telephone: d.phone,
+            site_web: d.url,
+            horaires: d.work_hours,
+            note: d.rating,
+            description: d.description,
+            attributs: d.attributes,
+            liens: d.local_business_links,
+          },
+          null,
+          2,
+        );
+        result.sourcesStatus.push({
+          type: 'DataForSEO (Google My Business)',
+          ok: true,
+          details: d.title || 'Fiche trouvée',
+        });
+
+        // 2. Si la fiche GMB contient un site web, on tente de le scraper aussi
+        if (d.url) {
+          try {
+            scraped.website_from_gmb = await scrapeDirect(d.url);
+            result.sourcesStatus.push({ type: 'Site web (depuis GMB)', ok: true });
+          } catch {
+            try {
+              scraped.website_from_gmb = await scrapeViaJina(d.url);
+              result.sourcesStatus.push({ type: 'Site web (via Jina)', ok: true });
+            } catch {
+              result.sourcesStatus.push({
+                type: 'Site web',
+                ok: false,
+                error: 'Inaccessible',
+              });
+            }
+          }
+        }
+      } else {
+        result.sourcesStatus.push({
+          type: 'DataForSEO',
+          ok: false,
+          error: dataforseoData.error || 'Non trouvé',
+        });
+      }
+    }
+  }
+
+  // 3. URL directe (site web ou annuaire) → scrape
+  const directScrapeTypes = [
+    'website',
+    'pages_jaunes',
+    'tripadvisor',
+    'thefork',
+    'yelp',
+    'directory_other',
+  ];
+  if (directScrapeTypes.includes(detected.type)) {
     try {
       let content = '';
       try {
-        content = await scrapeUrl(sources.website);
+        content = await scrapeDirect(detected.value);
       } catch {
-        content = await scrapeViaJina(sources.website);
+        content = await scrapeViaJina(detected.value);
       }
-      scraped.website = content;
-      result.sources.website = { fetched: true, chars: content.length };
+      scraped.primary_url = content;
+      result.sourcesStatus.push({
+        type: `URL ${detected.type}`,
+        ok: true,
+        details: `${content.length} car.`,
+      });
     } catch (e) {
-      result.sources.website = {
-        fetched: false,
-        error: e instanceof Error ? e.message : 'Unknown',
-        chars: 0,
-      };
+      result.sourcesStatus.push({
+        type: `URL ${detected.type}`,
+        ok: false,
+        error: e instanceof Error ? e.message : 'Inaccessible',
+      });
     }
   }
 
-  if (sources.gmb_url) {
-    try {
-      const content = await scrapeViaJina(sources.gmb_url, 8000);
-      scraped.gmb = content;
-      result.sources.gmb = { fetched: true, chars: content.length };
-    } catch (e) {
-      result.sources.gmb = {
-        fetched: false,
-        error: e instanceof Error ? e.message : 'Unknown',
-        chars: 0,
-      };
-    }
-  }
-
+  // 4. Réseaux sociaux (optionnels)
   if (sources.facebook) {
     try {
       scraped.facebook = await scrapeViaJina(sources.facebook, 5000);
-      result.sources.facebook = { fetched: true };
+      result.sourcesStatus.push({ type: 'Facebook', ok: true });
     } catch {
-      result.sources.facebook = { fetched: false, error: 'Page privée ou bloquée' };
+      result.sourcesStatus.push({
+        type: 'Facebook',
+        ok: false,
+        error: 'Privé ou bloqué',
+      });
     }
   }
-
   if (sources.instagram) {
     try {
       scraped.instagram = await scrapeViaJina(sources.instagram, 5000);
-      result.sources.instagram = { fetched: true };
+      result.sourcesStatus.push({ type: 'Instagram', ok: true });
     } catch {
-      result.sources.instagram = { fetched: false, error: 'Compte privé ou bloqué' };
+      result.sourcesStatus.push({
+        type: 'Instagram',
+        ok: false,
+        error: 'Privé ou bloqué',
+      });
     }
   }
 
+  // Rien récupéré → sortie propre
   if (Object.keys(scraped).length === 0) {
+    result.dataforseo = dataforseoData;
     return result;
   }
 
+  // 5. Synthèse Claude Sonnet
   try {
     const anthropic = new Anthropic({ apiKey: anthropicKey });
     const sourcesBlock = Object.entries(scraped)
@@ -131,24 +206,26 @@ export async function enrichBusinessContext(
       messages: [
         {
           role: 'user',
-          content: `Tu es un assistant qui synthétise des informations business pour alimenter un CallBot vocal IA.
+          content: `Tu es un assistant qui synthétise des informations business pour alimenter un CallBot vocal IA français.
 
-NOM DE L'ÉTABLISSEMENT : ${businessName}
+NOM DE L'ÉTABLISSEMENT : ${businessName || detected.extractedName || 'non précisé'}
 
-SOURCES BRUTES SCRAPÉES :
+SOURCES BRUTES COLLECTÉES :
 ${sourcesBlock}
 
 Rédige une section "CONTEXTE BUSINESS RÉEL" en prose française naturelle (pas de bullets, pas de listes, pas de markdown), qui synthétise TOUT ce que le CallBot doit savoir pour être crédible au téléphone :
-- Nature exacte de l'activité
-- Horaires d'ouverture avec jours de fermeture
-- Services, plats, produits, prestations proposés avec détails
+- Nature exacte de l'activité et catégorie
+- Adresse complète et moyens d'accès
+- Horaires d'ouverture précis avec jours de fermeture
+- Téléphone, email si disponibles
+- Services, plats, produits, prestations proposés avec détails concrets
 - Équipe, chef, gérant si mentionnés
-- Événements spéciaux en cours (menu saisonnier, promo, nouveauté)
-- Adresse, moyens d'accès, parking si mentionnés
-- Points forts cités par les clients
+- Événements spéciaux en cours
+- Avis clients (score, points forts cités)
+- Attributs particuliers (terrasse, parking, wifi, accès PMR...)
 
-N'invente JAMAIS d'information non présente dans les sources. Si une info manque, n'en parle pas.
-Écris de façon fluide et factuelle, max 400 mots. Commence directement par la synthèse, sans préambule.`,
+N'invente JAMAIS d'information non présente dans les sources. Si une info manque, ne l'évoque pas.
+Écris de façon fluide et factuelle, max 450 mots. Commence directement par la synthèse, sans préambule.`,
         },
       ],
     });
@@ -162,5 +239,10 @@ N'invente JAMAIS d'information non présente dans les sources. Si une info manqu
     console.error('Anthropic synthesis failed:', e);
   }
 
+  result.dataforseo = dataforseoData;
+  result.cost = {
+    dataforseo: dataforseoData?.rawCost || 0,
+    anthropic: 0,
+  };
   return result;
 }

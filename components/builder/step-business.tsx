@@ -12,37 +12,56 @@ import { Textarea } from '@/components/ui/textarea';
 import type { EnrichmentStatus } from '@/lib/builder-types';
 import type { BusinessInfo } from '@/lib/callbot-configs';
 
+const DETECTED_TYPE_LABELS: Record<string, string> = {
+  business_name: 'Nom de commerce',
+  google_maps: 'Google Maps',
+  pages_jaunes: 'Pages Jaunes',
+  tripadvisor: 'TripAdvisor',
+  thefork: 'TheFork',
+  yelp: 'Yelp',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  website: 'Site web',
+  directory_other: 'Annuaire',
+  unknown: 'Inconnu',
+};
+
 interface SourceDisplay {
-  key: 'website' | 'gmb' | 'facebook' | 'instagram';
-  label: string;
-  fetched: boolean;
+  type: string;
+  ok: boolean;
+  details?: string;
   error?: string;
 }
 
 interface StepBusinessPatch {
   businessInfo?: BusinessInfo;
+  primarySource?: string;
   enrichedContext?: string;
   enrichmentStatus?: EnrichmentStatus;
+  detectedType?: string;
 }
 
 interface StepBusinessProps {
   businessInfo: BusinessInfo;
+  primarySource: string;
   enrichedContext?: string;
   enrichmentStatus: EnrichmentStatus;
+  detectedType?: string;
   onChange: (patch: StepBusinessPatch) => void;
 }
 
 interface FieldProps {
-  id: keyof BusinessInfo;
+  id: keyof BusinessInfo | 'primary';
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
   type?: 'text' | 'tel' | 'url';
   placeholder?: string;
+  helper?: string;
 }
 
-function Field({ id, label, value, onChange, required, type = 'text', placeholder }: FieldProps) {
+function Field({ id, label, value, onChange, required, type = 'text', placeholder, helper }: FieldProps) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>
@@ -56,40 +75,37 @@ function Field({ id, label, value, onChange, required, type = 'text', placeholde
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
       />
+      {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
     </div>
   );
 }
 
 export function StepBusiness({
   businessInfo,
+  primarySource,
   enrichedContext,
   enrichmentStatus,
+  detectedType,
   onChange,
 }: StepBusinessProps) {
   const [sourcesStatus, setSourcesStatus] = useState<SourceDisplay[]>([]);
+  const [cost, setCost] = useState<number | null>(null);
 
   const update = (key: keyof BusinessInfo, value: string) =>
     onChange({ businessInfo: { ...businessInfo, [key]: value } });
 
   const isLoading = enrichmentStatus === 'loading';
+  const canEnrich = Boolean(businessInfo.name?.trim() || primarySource.trim());
 
   const handleEnrich = async () => {
-    if (!businessInfo.name?.trim()) {
-      toast.error('Le nom de l\'établissement est requis avant enrichissement');
-      return;
-    }
-    const hasSource =
-      businessInfo.website ||
-      businessInfo.gmb_url ||
-      businessInfo.facebook ||
-      businessInfo.instagram;
-    if (!hasSource) {
-      toast.error('Renseigne au moins un lien (site, GMB, Facebook ou Instagram)');
+    if (!canEnrich) {
+      toast.error("Renseigne au moins le nom de l'établissement ou un lien");
       return;
     }
 
     onChange({ enrichmentStatus: 'loading' });
     setSourcesStatus([]);
+    setCost(null);
 
     try {
       const res = await fetch('/api/enrich-business', {
@@ -97,41 +113,32 @@ export function StepBusiness({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessName: businessInfo.name,
-          sources: {
-            website: businessInfo.website,
-            gmb_url: businessInfo.gmb_url,
-            facebook: businessInfo.facebook,
-            instagram: businessInfo.instagram,
-          },
+          primary: primarySource,
+          facebook: businessInfo.facebook,
+          instagram: businessInfo.instagram,
         }),
       });
       const data = (await res.json()) as {
         success: boolean;
         contextSummary?: string;
+        detectedType?: string;
         error?: string;
-        sources?: Record<string, { fetched: boolean; error?: string }>;
+        sourcesStatus?: SourceDisplay[];
+        cost?: { dataforseo: number };
       };
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      setSourcesStatus(data.sourcesStatus || []);
+      setCost(data.cost?.dataforseo ?? null);
+
+      if (!data.success) {
+        throw new Error('Enrichissement incomplet — voir les statuts sources');
       }
 
-      const statuses: SourceDisplay[] = [];
-      const srcs = data.sources ?? {};
-      const labelMap: Record<SourceDisplay['key'], string> = {
-        website: 'Site web',
-        gmb: 'Google My Business',
-        facebook: 'Facebook',
-        instagram: 'Instagram',
-      };
-      (['website', 'gmb', 'facebook', 'instagram'] as const).forEach((k) => {
-        const s = srcs[k];
-        if (s) statuses.push({ key: k, label: labelMap[k], fetched: s.fetched, error: s.error });
-      });
-
-      setSourcesStatus(statuses);
       onChange({
         enrichedContext: data.contextSummary || '',
+        detectedType: data.detectedType,
         enrichmentStatus: 'done',
       });
       toast.success('Contexte business enrichi');
@@ -141,6 +148,10 @@ export function StepBusiness({
       onChange({ enrichmentStatus: 'error' });
     }
   };
+
+  const detectedLabel = detectedType
+    ? DETECTED_TYPE_LABELS[detectedType] || detectedType
+    : null;
 
   return (
     <div className="space-y-8">
@@ -182,54 +193,58 @@ export function StepBusiness({
           onChange={(v) => update('hours', v)}
           placeholder="Lun-Sam 12h-22h"
         />
-        <Field
-          id="website"
-          label="Site web"
-          type="url"
-          value={businessInfo.website || ''}
-          onChange={(v) => update('website', v)}
-          placeholder="https://..."
-        />
-        <Field
-          id="gmb_url"
-          label="Google My Business"
-          type="url"
-          value={businessInfo.gmb_url || ''}
-          onChange={(v) => update('gmb_url', v)}
-          placeholder="https://maps.app.goo.gl/..."
-        />
-        <Field
-          id="facebook"
-          label="Facebook"
-          type="url"
-          value={businessInfo.facebook || ''}
-          onChange={(v) => update('facebook', v)}
-          placeholder="https://facebook.com/..."
-        />
-        <Field
-          id="instagram"
-          label="Instagram"
-          type="url"
-          value={businessInfo.instagram || ''}
-          onChange={(v) => update('instagram', v)}
-          placeholder="https://instagram.com/..."
-        />
       </div>
 
-      <div className="space-y-4 pt-4 border-t">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="font-semibold">Enrichissement automatique du contexte</h3>
-            <p className="text-sm text-muted-foreground">
-              Claude Sonnet analyse le site web, Google My Business et les réseaux pour fournir un
-              contexte business réel au bot. Facultatif mais fortement recommandé.
-            </p>
-          </div>
+      <div className="space-y-4 pt-6 border-t">
+        <div>
+          <h3 className="font-semibold">Enrichissement automatique du contexte</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Colle un nom ou un lien. On interroge DataForSEO (Google My Business) et on scrape
+            les sources additionnelles, puis Claude Sonnet synthétise le tout.
+          </p>
+        </div>
+
+        <Field
+          id="primary"
+          label="Nom ou lien de votre établissement"
+          value={primarySource}
+          onChange={(v) => onChange({ primarySource: v })}
+          placeholder="Le Ti Taurus ou https://maps.google.com/... ou https://monresto.fr"
+          helper="Acceptés : nom seul, Google Maps, Pages Jaunes, TripAdvisor, TheFork, site web..."
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field
+            id="facebook"
+            label="Facebook (optionnel)"
+            type="url"
+            value={businessInfo.facebook || ''}
+            onChange={(v) => update('facebook', v)}
+            placeholder="https://facebook.com/..."
+          />
+          <Field
+            id="instagram"
+            label="Instagram (optionnel)"
+            type="url"
+            value={businessInfo.instagram || ''}
+            onChange={(v) => update('instagram', v)}
+            placeholder="https://instagram.com/..."
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 pt-2">
+          <p className="text-xs text-muted-foreground">
+            {isLoading && 'Analyse DataForSEO + synthèse Claude — 5 à 40 secondes.'}
+            {!isLoading &&
+              enrichmentStatus === 'done' &&
+              'Contexte synthétisé. Tu peux relancer si tu changes les sources.'}
+            {!isLoading && enrichmentStatus !== 'done' && 'Aucune analyse en cours.'}
+          </p>
           <Button
             type="button"
             variant={enrichmentStatus === 'done' ? 'outline' : 'default'}
             onClick={handleEnrich}
-            disabled={isLoading}
+            disabled={isLoading || !canEnrich}
             className="shrink-0"
           >
             {isLoading ? (
@@ -251,25 +266,27 @@ export function StepBusiness({
           </Button>
         </div>
 
-        {isLoading && (
-          <p className="text-sm text-muted-foreground italic">
-            Scraping des sources + synthèse Claude Sonnet — peut prendre 5 à 30 secondes.
-          </p>
+        {detectedLabel && !isLoading && (
+          <div>
+            <Badge variant="secondary">Détecté : {detectedLabel}</Badge>
+          </div>
         )}
 
         {sourcesStatus.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {sourcesStatus.map((s) => (
+            {sourcesStatus.map((s, i) => (
               <Badge
-                key={s.key}
+                key={`${s.type}-${i}`}
                 className={
-                  s.fetched
+                  s.ok
                     ? 'bg-green-600 text-white hover:bg-green-600'
                     : 'bg-amber-500 text-white hover:bg-amber-500'
                 }
-                title={s.error}
+                title={s.error || s.details}
               >
-                {s.fetched ? '✓' : '⚠'} {s.label}
+                {s.ok ? '✓' : '⚠'} {s.type}
+                {s.details && <span className="ml-1 opacity-80">— {s.details}</span>}
+                {s.error && <span className="ml-1 opacity-80">— {s.error}</span>}
               </Badge>
             ))}
           </div>
@@ -280,13 +297,13 @@ export function StepBusiness({
             <CardHeader>
               <CardTitle className="text-base">Synthèse du contexte business</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Textarea
-                value={enrichedContext}
-                readOnly
-                rows={12}
-                className="text-sm font-normal"
-              />
+            <CardContent className="space-y-2">
+              <Textarea value={enrichedContext} readOnly rows={12} className="text-sm" />
+              {cost !== null && (
+                <p className="text-xs text-muted-foreground text-right">
+                  Coût DataForSEO : ${cost.toFixed(4)}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

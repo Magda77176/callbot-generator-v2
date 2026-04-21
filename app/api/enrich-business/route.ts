@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { enrichBusinessContext, type EnrichmentSources } from '@/lib/context-enricher';
+import { enrichBusinessContext } from '@/lib/context-enricher';
 
 interface EnrichRequestBody {
   businessName?: string;
-  sources?: EnrichmentSources;
+  primary?: string;
+  facebook?: string;
+  instagram?: string;
 }
 
 export async function POST(request: Request) {
@@ -16,16 +18,20 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as EnrichRequestBody;
-    const { businessName, sources } = body;
+    const { businessName, primary, facebook, instagram } = body;
 
-    if (!businessName) {
+    if (!primary && !businessName) {
       return NextResponse.json(
-        { success: false, error: 'businessName requis' },
+        { success: false, error: 'primary (nom ou URL) requis' },
         { status: 400 },
       );
     }
 
-    const result = await enrichBusinessContext(businessName, sources || {});
+    const result = await enrichBusinessContext(businessName || '', {
+      primary: primary || businessName || '',
+      facebook,
+      instagram,
+    });
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';
@@ -33,4 +39,4 @@ export async function POST(request: Request) {
   }
 }
 
-export const maxDuration = 30;
+export const maxDuration = 60;

@@ -21,7 +21,7 @@ export const CALLBOT_CONFIGS: Record<Sector, CallbotConfig> = {
     name: 'Marco',
     sector: 'restaurant',
     greeting:
-      'Restaurant {{business_name}}, bonjour, Marco à votre service. Comment puis-je vous aider ?',
+      'Marco du restaurant {{business_name}}, bonjour, comment puis-je vous aider ?',
     systemPrompt: `Tu es Marco, le standard téléphonique de {{business_name}}.
 
 Tu n'es PAS un assistant virtuel. Tu parles comme un vrai serveur expérimenté qui décroche le téléphone entre deux services. Un peu fatigué mais chaleureux. Naturel.

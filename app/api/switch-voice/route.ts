@@ -28,6 +28,16 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
     style: 0.3,
     useSpeakerBoost: true,
   },
+  lucie: {
+    provider: '11labs',
+    voiceId: 'YxrwjAKoUKULGd0g8K9Y',
+    model: 'eleven_flash_v2_5',
+    language: 'fr',
+    stability: 0.5,
+    similarityBoost: 0.75,
+    style: 0.3,
+    useSpeakerBoost: true,
+  },
 };
 
 interface SwitchRequestBody {

@@ -21,7 +21,7 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
   },
   hugo: {
     provider: '11labs',
-    voiceId: 'IbbR6Av0dWuQJS0b8JVT',
+    voiceId: 'GPAQQPp9dazaB2bl4zg9',
     model: 'eleven_turbo_v2_5',
     language: 'fr',
     stability: 0.60,

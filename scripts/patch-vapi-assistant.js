@@ -10,10 +10,6 @@ const patch = {
     voiceId: '80e11491-2d8a-4361-ac61-c4f3e0a4f7e7',  // Vincent - énergique engageant
     model: 'sonic-3',
     language: 'fr',
-    experimentalControls: {
-      speed: 'slow',
-      emotion: ['positivity:high', 'curiosity:high'],
-    },
   },
   numWordsToInterruptAssistant: 4,
   responseDelaySeconds: 1.0,

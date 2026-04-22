@@ -14,6 +14,12 @@ interface DataForSeoBusinessInfo {
   cid?: string;
   latitude?: number;
   longitude?: number;
+  menu_url?: string | null;
+  book_online_url?: string | null;
+  order_online_url?: string | null;
+  additional_categories?: string[];
+  price_level?: string | null;
+  snippet?: string | null;
 }
 
 export interface DataForSeoResult {
@@ -118,6 +124,12 @@ export async function searchBusinessByName(
         cid: first.cid,
         latitude: first.latitude,
         longitude: first.longitude,
+        menu_url: first.menu_url ?? null,
+        book_online_url: first.book_online_url ?? null,
+        order_online_url: first.order_online_url ?? null,
+        additional_categories: first.additional_categories ?? [],
+        price_level: first.price_level ?? null,
+        snippet: first.snippet ?? null,
       },
     };
   } catch (e) {

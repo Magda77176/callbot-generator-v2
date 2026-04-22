@@ -119,6 +119,36 @@ export async function enrichBusinessContext(
             }
           }
         }
+
+        // 2bis. Scraper le menu_url GMB si disponible
+        if (d.menu_url) {
+          const menuUrl = d.menu_url;
+          try {
+            let menuContent = '';
+            try {
+              menuContent = await scrapeDirect(menuUrl, 15000);
+            } catch {
+              menuContent = '';
+            }
+            if (!menuContent || menuContent.length < 200) {
+              menuContent = await scrapeViaJina(menuUrl, 15000);
+            }
+            if (menuContent) {
+              scraped.menu_from_gmb = menuContent.slice(0, 15000);
+              result.sourcesStatus.push({
+                type: 'menu',
+                ok: true,
+                details: `Menu récupéré depuis ${new URL(menuUrl).hostname}`,
+              });
+            }
+          } catch (e) {
+            result.sourcesStatus.push({
+              type: 'menu',
+              ok: false,
+              error: `Menu non accessible : ${(e as Error).message}`,
+            });
+          }
+        }
       } else {
         result.sourcesStatus.push({
           type: 'DataForSEO',
@@ -218,11 +248,14 @@ Rédige une section "CONTEXTE BUSINESS RÉEL" en prose française naturelle (pas
 - Adresse complète et moyens d'accès
 - Horaires d'ouverture précis avec jours de fermeture
 - Téléphone, email si disponibles
-- Services, plats, produits, prestations proposés avec détails concrets
+- Plats, menus et prix précis (TRÈS IMPORTANT si la source menu_from_gmb existe : liste explicitement les principaux plats avec leurs prix et noms, allergènes signalés, formules midi/soir, spécialités)
+- Services et prestations annexes (livraison, réservation en ligne, événements privés)
 - Équipe, chef, gérant si mentionnés
 - Événements spéciaux en cours
 - Avis clients (score, points forts cités)
 - Attributs particuliers (terrasse, parking, wifi, accès PMR...)
+
+Si une source menu_from_gmb est présente, tu DOIS inclure dans ta synthèse les plats-phares avec leurs prix, au moins 5 à 10 plats représentatifs. Le CallBot doit pouvoir répondre naturellement à "qu'est-ce que vous avez comme plat aujourd'hui" ou "c'est combien la salade machin".
 
 N'invente JAMAIS d'information non présente dans les sources. Si une info manque, ne l'évoque pas.
 Écris de façon fluide et factuelle, max 450 mots. Commence directement par la synthèse, sans préambule.`,

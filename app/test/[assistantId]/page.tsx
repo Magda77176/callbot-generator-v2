@@ -25,7 +25,7 @@ const VOICE_PRESETS = [
     description: 'Français chaleureux',
     voice: {
       provider: '11labs',
-      voiceId: 'GPAQQPp9dazaB2bl4zg9',
+      voiceId: 'odOFTFZU3DvAZ3EV3KHi',
       model: 'eleven_turbo_v2_5',
       language: 'fr',
       stability: 0.60,

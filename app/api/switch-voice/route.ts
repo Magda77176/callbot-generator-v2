@@ -33,7 +33,7 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
   lucie: {
     provider: '11labs',
     voiceId: 'YxrwjAKoUKULGd0g8K9Y',
-    model: 'eleven_turbo_v2_5',
+    model: 'eleven_multilingual_v2',
     language: 'fr',
     stability: 0.60,
     similarityBoost: 0.75,

@@ -9,6 +9,7 @@ interface VapiVoice {
   similarityBoost?: number;
   style?: number;
   useSpeakerBoost?: boolean;
+  speed?: number;
 }
 
 const VOICE_PRESETS: Record<string, VapiVoice> = {
@@ -21,22 +22,24 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
   hugo: {
     provider: '11labs',
     voiceId: 'IbbR6Av0dWuQJS0b8JVT',
-    model: 'eleven_flash_v2_5',
+    model: 'eleven_turbo_v2_5',
     language: 'fr',
-    stability: 0.5,
-    similarityBoost: 0.75,
-    style: 0.3,
+    stability: 0.35,
+    similarityBoost: 0.65,
+    style: 0.55,
     useSpeakerBoost: true,
+    speed: 0.95,
   },
   lucie: {
     provider: '11labs',
     voiceId: 'YxrwjAKoUKULGd0g8K9Y',
-    model: 'eleven_flash_v2_5',
+    model: 'eleven_turbo_v2_5',
     language: 'fr',
-    stability: 0.5,
-    similarityBoost: 0.75,
-    style: 0.3,
+    stability: 0.35,
+    similarityBoost: 0.65,
+    style: 0.55,
     useSpeakerBoost: true,
+    speed: 0.95,
   },
 };
 

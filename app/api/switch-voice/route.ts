@@ -19,6 +19,18 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
     model: 'sonic-3',
     language: 'fr',
   },
+  marc: {
+    provider: 'cartesia',
+    voiceId: 'ce74c4da-4aee-435d-bc6d-81d1a9367e12',
+    model: 'sonic-3',
+    language: 'fr',
+  },
+  helene: {
+    provider: 'cartesia',
+    voiceId: '65b25c5d-ff07-4687-a04c-da2f43ef6fa9',
+    model: 'sonic-3',
+    language: 'fr',
+  },
   hugo: {
     provider: '11labs',
     voiceId: 'odOFTFZU3DvAZ3EV3KHi',

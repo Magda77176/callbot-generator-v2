@@ -11,10 +11,32 @@ const VOICE_PRESETS = [
   {
     id: 'vincent',
     label: 'Vincent (Cartesia)',
-    description: 'Économique',
+    description: 'Énergique, engageant',
     voice: {
       provider: 'cartesia',
       voiceId: '80e11491-2d8a-4361-ac61-c4f3e0a4f7e7',
+      model: 'sonic-3',
+      language: 'fr',
+    },
+  },
+  {
+    id: 'marc',
+    label: 'Marc (Cartesia)',
+    description: 'Conversationnel, casual',
+    voice: {
+      provider: 'cartesia',
+      voiceId: 'ce74c4da-4aee-435d-bc6d-81d1a9367e12',
+      model: 'sonic-3',
+      language: 'fr',
+    },
+  },
+  {
+    id: 'helene',
+    label: 'Hélène (Cartesia)',
+    description: 'Cheery, friendly French Lady',
+    voice: {
+      provider: 'cartesia',
+      voiceId: '65b25c5d-ff07-4687-a04c-da2f43ef6fa9',
       model: 'sonic-3',
       language: 'fr',
     },

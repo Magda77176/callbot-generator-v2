@@ -20,12 +20,12 @@ const VOICE_PRESETS = [
     },
   },
   {
-    id: 'antoni',
-    label: 'Antoni (ElevenLabs)',
-    description: 'Chaleureux premium',
+    id: 'hugo',
+    label: 'Hugo (ElevenLabs)',
+    description: 'Français chaleureux',
     voice: {
       provider: '11labs',
-      voiceId: 'ErXwobaYiN019PkySvjV',
+      voiceId: 'IbbR6Av0dWuQJS0b8JVT',
       model: 'eleven_flash_v2_5',
       language: 'fr',
       stability: 0.5,

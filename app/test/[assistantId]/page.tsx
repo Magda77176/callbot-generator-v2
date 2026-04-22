@@ -50,18 +50,13 @@ export default function TestPage({ params }: TestPageProps) {
     if (!preset) return;
     setSwitching(true);
     try {
-      const res = await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ voice: preset.voice }),
+      const res = await fetch('/api/switch-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assistantId, presetId }),
       });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`HTTP ${res.status} — ${err}`);
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setCurrentPreset(presetId);
       toast.success(`Voix : ${preset.label}`);
     } catch (e) {

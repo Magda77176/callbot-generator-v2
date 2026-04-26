@@ -3,7 +3,7 @@
   "trailingSlash": false,
   "git": {
     "deploymentEnabled": {
-      "main": true
+      "master": true
     }
   },
   "rewrites": [

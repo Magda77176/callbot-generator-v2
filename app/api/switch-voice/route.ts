@@ -55,9 +55,39 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
   },
 };
 
+const PRESET_AGENT_NAMES: Record<string, string> = {
+  vincent: 'Vincent',
+  marc: 'Marc',
+  helene: 'Hélène',
+  hugo: 'Hugo',
+  lucie: 'Lucie',
+};
+
+const KNOWN_AGENT_NAMES = [
+  'Marco', 'Léa', 'Tom', 'Alex', 'Sophie',
+  'Vincent', 'Marc', 'Hélène', 'Hugo', 'Lucie',
+];
+
 interface SwitchRequestBody {
   assistantId?: string;
   presetId?: string;
+}
+
+interface VapiModelMessage {
+  role?: string;
+  content?: unknown;
+}
+
+interface VapiModel {
+  systemPrompt?: string;
+  messages?: VapiModelMessage[];
+  [k: string]: unknown;
+}
+
+interface VapiAssistant {
+  firstMessage?: string;
+  model?: VapiModel;
+  [k: string]: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -76,17 +106,59 @@ export async function POST(req: NextRequest) {
     }
 
     const voice = VOICE_PRESETS[presetId];
-    if (!voice) {
+    const newAgentName = PRESET_AGENT_NAMES[presetId];
+    if (!voice || !newAgentName) {
       return NextResponse.json({ error: `Preset inconnu: ${presetId}` }, { status: 400 });
+    }
+
+    const auth = `Bearer ${process.env.VAPI_API_KEY}`;
+
+    // GET current assistant pour détecter l'ancien prénom et patcher firstMessage + systemPrompt
+    const getRes = await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
+      headers: { Authorization: auth },
+    });
+    if (!getRes.ok) {
+      const err = await getRes.text();
+      return NextResponse.json(
+        { error: `Vapi GET ${getRes.status}: ${err}` },
+        { status: getRes.status },
+      );
+    }
+    const current = (await getRes.json()) as VapiAssistant;
+
+    const patchBody: Record<string, unknown> = { voice };
+
+    const currentFirstMessage = current.firstMessage ?? '';
+    const firstWord = currentFirstMessage.match(/^[\p{L}-]+/u)?.[0] ?? '';
+    const oldAgentName = KNOWN_AGENT_NAMES.includes(firstWord) ? firstWord : null;
+
+    if (oldAgentName && oldAgentName !== newAgentName) {
+      const swap = (s: string) => s.split(oldAgentName).join(newAgentName);
+
+      patchBody.firstMessage = swap(currentFirstMessage);
+
+      if (current.model) {
+        const newModel: VapiModel = { ...current.model };
+        if (typeof newModel.systemPrompt === 'string') {
+          newModel.systemPrompt = swap(newModel.systemPrompt);
+        }
+        if (Array.isArray(newModel.messages)) {
+          newModel.messages = newModel.messages.map((m) => ({
+            ...m,
+            content: typeof m.content === 'string' ? swap(m.content) : m.content,
+          }));
+        }
+        patchBody.model = newModel;
+      }
     }
 
     const res = await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
+        Authorization: auth,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ voice }),
+      body: JSON.stringify(patchBody),
     });
 
     if (!res.ok) {
@@ -97,7 +169,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, presetId });
+    return NextResponse.json({
+      success: true,
+      presetId,
+      agentName: newAgentName,
+      renamedFrom: oldAgentName,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';
     return NextResponse.json({ error: msg }, { status: 500 });

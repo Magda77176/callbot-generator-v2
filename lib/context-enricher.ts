@@ -7,6 +7,7 @@ export interface EnrichmentSources {
   primary: string;
   facebook?: string;
   instagram?: string;
+  menu?: string;
 }
 
 export interface SourceStatus {
@@ -217,6 +218,16 @@ export async function enrichBusinessContext(
     }
   }
 
+  // Menu collé manuellement par l'utilisateur — source de vérité absolue
+  if (sources.menu && sources.menu.trim().length > 0) {
+    scraped.menu_manual = sources.menu.trim().slice(0, 15000);
+    result.sourcesStatus.push({
+      type: 'Menu (collé manuellement)',
+      ok: true,
+      details: `${scraped.menu_manual.length} car.`,
+    });
+  }
+
   // Rien récupéré → sortie propre
   if (Object.keys(scraped).length === 0) {
     result.dataforseo = dataforseoData;
@@ -255,7 +266,12 @@ Rédige une section "CONTEXTE BUSINESS RÉEL" en prose française naturelle (pas
 - Avis clients (score, points forts cités)
 - Attributs particuliers (terrasse, parking, wifi, accès PMR...)
 
-Si une source menu_from_gmb est présente, tu DOIS inclure dans ta synthèse les plats-phares avec leurs prix, au moins 5 à 10 plats représentatifs. Le CallBot doit pouvoir répondre naturellement à "qu'est-ce que vous avez comme plat aujourd'hui" ou "c'est combien la salade machin".
+Si une source menu_manual ou menu_from_gmb est présente, tu DOIS inclure dans ta synthèse les plats-phares avec leurs prix, au moins 5 à 10 plats représentatifs (ou TOUS si le menu en contient moins). Le CallBot doit pouvoir répondre naturellement à "qu'est-ce que vous avez comme plat aujourd'hui" ou "c'est combien la salade machin".
+
+PRIORITÉ DES SOURCES sur le menu :
+1. menu_manual (collé par le restaurateur) = source de vérité ABSOLUE — recopie les plats et prix tels quels, sans paraphraser ni omettre
+2. menu_from_gmb (scrapé) = à utiliser seulement si menu_manual est absent
+3. autres sources (avis, site web) = pour le contexte général uniquement, jamais pour inventer des plats ou des prix
 
 N'invente JAMAIS d'information non présente dans les sources. Si une info manque, ne l'évoque pas.
 Écris de façon fluide et factuelle, max 450 mots. Commence directement par la synthèse, sans préambule.`,

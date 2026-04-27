@@ -36,6 +36,7 @@ interface SourceDisplay {
 interface StepBusinessPatch {
   businessInfo?: BusinessInfo;
   primarySource?: string;
+  manualMenu?: string;
   enrichedContext?: string;
   enrichmentStatus?: EnrichmentStatus;
   detectedType?: string;
@@ -44,6 +45,7 @@ interface StepBusinessPatch {
 interface StepBusinessProps {
   businessInfo: BusinessInfo;
   primarySource: string;
+  manualMenu: string;
   enrichedContext?: string;
   enrichmentStatus: EnrichmentStatus;
   detectedType?: string;
@@ -83,6 +85,7 @@ function Field({ id, label, value, onChange, required, type = 'text', placeholde
 export function StepBusiness({
   businessInfo,
   primarySource,
+  manualMenu,
   enrichedContext,
   enrichmentStatus,
   detectedType,
@@ -116,6 +119,7 @@ export function StepBusiness({
           primary: primarySource,
           facebook: businessInfo.facebook,
           instagram: businessInfo.instagram,
+          menu: manualMenu,
         }),
       });
       const data = (await res.json()) as {
@@ -212,6 +216,24 @@ export function StepBusiness({
           placeholder="Le Ti Taurus ou https://maps.google.com/... ou https://monresto.fr"
           helper="Acceptés : nom seul, Google Maps, Pages Jaunes, TripAdvisor, TheFork, site web..."
         />
+
+        <div className="space-y-2">
+          <Label htmlFor="manual-menu">
+            Menu / carte (optionnel — collez votre carte ici)
+          </Label>
+          <Textarea
+            id="manual-menu"
+            value={manualMenu}
+            onChange={(e) => onChange({ manualMenu: e.target.value })}
+            rows={8}
+            placeholder={`Ex.\nEntrées :\n- Accras de morue — 8 €\n- Boudin créole — 9 €\n\nPlats :\n- Colombo de poulet — 18 €\n- Langouste grillée — 38 €\n- Brochette de saint-jacques — 24 €\n\nDesserts :\n- Blanc-manger coco — 7 €`}
+            className="font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            Google ne donne pas le menu via API. Si vous le collez ici, le bot pourra citer
+            les plats et leurs prix au lieu de rester vague.
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field

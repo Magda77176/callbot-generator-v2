@@ -15,6 +15,7 @@ export interface BuilderState {
   sector: Sector | null;
   businessInfo: BusinessInfo;
   primarySource: string;
+  manualMenu: string;
   systemPrompt: string;
   voiceId: string;
   gender: VoiceGender;

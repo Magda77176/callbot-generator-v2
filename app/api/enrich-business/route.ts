@@ -6,6 +6,7 @@ interface EnrichRequestBody {
   primary?: string;
   facebook?: string;
   instagram?: string;
+  menu?: string;
 }
 
 export async function POST(request: Request) {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as EnrichRequestBody;
-    const { businessName, primary, facebook, instagram } = body;
+    const { businessName, primary, facebook, instagram, menu } = body;
 
     if (!primary && !businessName) {
       return NextResponse.json(
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
       primary: primary || businessName || '',
       facebook,
       instagram,
+      menu,
     });
     return NextResponse.json(result);
   } catch (e) {

@@ -23,6 +23,7 @@ const INITIAL_STATE: BuilderState = {
   sector: null,
   businessInfo: {},
   primarySource: '',
+  manualMenu: '',
   systemPrompt: '',
   voiceId: DEFAULT_VOICE_ID,
   gender: getVoiceById(DEFAULT_VOICE_ID)?.gender ?? 'male',
@@ -114,6 +115,7 @@ export default function BuilderPage() {
           <StepBusiness
             businessInfo={state.businessInfo}
             primarySource={state.primarySource}
+            manualMenu={state.manualMenu}
             enrichedContext={state.enrichedContext}
             enrichmentStatus={state.enrichmentStatus ?? 'idle'}
             detectedType={state.detectedType}

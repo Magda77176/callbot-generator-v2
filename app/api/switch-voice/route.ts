@@ -68,9 +68,51 @@ const KNOWN_AGENT_NAMES = [
   'Vincent', 'Marc', 'Hélène', 'Hugo', 'Lucie',
 ];
 
+interface VoiceOverride {
+  voiceId?: string;
+  model?: string;
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  useSpeakerBoost?: boolean;
+  speed?: number;
+}
+
 interface SwitchRequestBody {
   assistantId?: string;
   presetId?: string;
+  voiceOverride?: VoiceOverride;
+}
+
+const NUMERIC_RANGES: Record<keyof VoiceOverride, [number, number] | null> = {
+  voiceId: null,
+  model: null,
+  stability: [0, 1],
+  similarityBoost: [0, 1],
+  style: [0, 1],
+  useSpeakerBoost: null,
+  speed: [0.5, 2],
+};
+
+function sanitizeOverride(o: VoiceOverride): VoiceOverride {
+  const out: VoiceOverride = {};
+  if (typeof o.voiceId === 'string' && o.voiceId.length > 0 && o.voiceId.length < 200) {
+    out.voiceId = o.voiceId;
+  }
+  if (typeof o.model === 'string' && o.model.length > 0 && o.model.length < 100) {
+    out.model = o.model;
+  }
+  if (typeof o.useSpeakerBoost === 'boolean') {
+    out.useSpeakerBoost = o.useSpeakerBoost;
+  }
+  for (const key of ['stability', 'similarityBoost', 'style', 'speed'] as const) {
+    const v = o[key];
+    const range = NUMERIC_RANGES[key];
+    if (typeof v === 'number' && range && v >= range[0] && v <= range[1]) {
+      out[key] = v;
+    }
+  }
+  return out;
 }
 
 interface VapiModelMessage {
@@ -96,7 +138,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { assistantId, presetId } = (await req.json()) as SwitchRequestBody;
+    const { assistantId, presetId, voiceOverride } = (await req.json()) as SwitchRequestBody;
 
     if (!assistantId || !presetId) {
       return NextResponse.json(
@@ -105,11 +147,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const voice = VOICE_PRESETS[presetId];
+    const baseVoice = VOICE_PRESETS[presetId];
     const newAgentName = PRESET_AGENT_NAMES[presetId];
-    if (!voice || !newAgentName) {
+    if (!baseVoice || !newAgentName) {
       return NextResponse.json({ error: `Preset inconnu: ${presetId}` }, { status: 400 });
     }
+
+    const voice: VapiVoice = voiceOverride
+      ? { ...baseVoice, ...sanitizeOverride(voiceOverride) }
+      : baseVoice;
 
     const auth = `Bearer ${process.env.VAPI_API_KEY}`;
 

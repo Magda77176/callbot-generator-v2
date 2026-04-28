@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { VoiceTester } from '@/components/voice-tester';
+import { VoiceTuner, type VoiceConfig } from '@/components/voice-tuner';
 
 const VOICE_PRESETS = [
   {
@@ -135,6 +136,18 @@ export default function TestPage({ params }: TestPageProps) {
           ))}
         </CardContent>
       </Card>
+
+      {currentPreset && (
+        <div className="mb-4">
+          <VoiceTuner
+            assistantId={assistantId}
+            presetId={currentPreset}
+            baseVoice={
+              VOICE_PRESETS.find((p) => p.id === currentPreset)!.voice as VoiceConfig
+            }
+          />
+        </div>
+      )}
 
       <VoiceTester assistantId={assistantId} />
     </main>

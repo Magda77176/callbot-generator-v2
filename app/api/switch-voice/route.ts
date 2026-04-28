@@ -47,11 +47,11 @@ const VOICE_PRESETS: Record<string, VapiVoice> = {
     voiceId: 'YxrwjAKoUKULGd0g8K9Y',
     model: 'eleven_multilingual_v2',
     language: 'fr',
-    stability: 0.60,
-    similarityBoost: 0.75,
-    style: 0.55,
+    stability: 0.45,
+    similarityBoost: 0.80,
+    style: 0.30,
     useSpeakerBoost: true,
-    speed: 1.10,
+    speed: 1.00,
   },
 };
 

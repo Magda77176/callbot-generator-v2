@@ -68,6 +68,9 @@ export default function BuilderPage() {
           businessInfo: state.businessInfo,
           voiceId: state.voiceId,
           enrichedContext: state.enrichedContext,
+          systemPrompt: state.systemPrompt,
+          model: state.model,
+          temperature: state.temperature,
         }),
       });
       const data = await res.json();

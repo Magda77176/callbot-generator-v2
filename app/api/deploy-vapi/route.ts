@@ -6,17 +6,45 @@ import {
   type BusinessInfo,
   type CallbotConfig,
 } from '@/lib/callbot-configs';
+import type { ModelOption } from '@/lib/builder-types';
 import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
 import { checkLimit, clientIp, deployLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 
 const DEFAULT_WEBHOOK_URL = 'https://webhook.homepop.fr/webhook/vapi';
 const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
+const DEFAULT_MODEL: ModelOption = 'gpt-4o-mini';
+const DEFAULT_TEMPERATURE = 0.3;
+
+const MODEL_OPTIONS: readonly ModelOption[] = [
+  'gpt-4o-mini',
+  'gpt-4o',
+  'claude-sonnet-4-6',
+] as const;
+
+function isModelOption(value: unknown): value is ModelOption {
+  return typeof value === 'string' && (MODEL_OPTIONS as readonly string[]).includes(value);
+}
+
+// Maps the wizard's ModelOption to the {provider, model} pair Vapi expects.
+function vapiModelConfig(option: ModelOption): { provider: string; model: string } {
+  switch (option) {
+    case 'gpt-4o-mini':
+      return { provider: 'openai', model: 'gpt-4o-mini' };
+    case 'gpt-4o':
+      return { provider: 'openai', model: 'gpt-4o' };
+    case 'claude-sonnet-4-6':
+      return { provider: 'anthropic', model: 'claude-sonnet-4-5' };
+  }
+}
 
 interface DeployRequestBody {
   sector?: string;
   businessInfo?: BusinessInfo;
   voiceId?: string;
   enrichedContext?: string;
+  systemPrompt?: string;
+  model?: string;
+  temperature?: number;
 }
 
 interface VapiAssistantResponse {
@@ -24,22 +52,32 @@ interface VapiAssistantResponse {
   phoneNumber?: string;
 }
 
+interface DeployOverrides {
+  systemPrompt?: string;
+  model: ModelOption;
+  temperature: number;
+}
+
 async function deployToVapi(
   config: CallbotConfig,
   businessInfo: BusinessInfo,
   voiceId: string,
-  enrichedContext?: string,
+  enrichedContext: string | undefined,
+  overrides: DeployOverrides,
 ): Promise<VapiAssistantResponse> {
-  const systemPrompt = buildPersonalizedPrompt(config, businessInfo, enrichedContext);
   const businessName = businessInfo.name || 'notre établissement';
+  // Honor the user-edited prompt if non-empty; otherwise rebuild from the persona template.
+  const rawPrompt = overrides.systemPrompt?.trim()
+    ? overrides.systemPrompt
+    : buildPersonalizedPrompt(config, businessInfo, enrichedContext);
+  const systemPrompt = rawPrompt.replace(/\{\{business_name\}\}/g, businessName);
 
   const payload = {
     name: `${config.name} - ${businessInfo.name || 'CallBot'}`,
     firstMessage: config.greeting.replace(/\{\{business_name\}\}/g, businessName),
     model: {
-      provider: 'openai',
-      model: 'gpt-4o-mini',
-      temperature: 0.3,
+      ...vapiModelConfig(overrides.model),
+      temperature: overrides.temperature,
       maxTokens: 200,
       systemPrompt,
     },
@@ -101,7 +139,8 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as DeployRequestBody;
-    const { sector, businessInfo, voiceId, enrichedContext } = body;
+    const { sector, businessInfo, voiceId, enrichedContext, systemPrompt, model, temperature } =
+      body;
 
     if (!sector || !isSector(sector)) {
       return NextResponse.json(
@@ -113,14 +152,19 @@ export async function POST(request: Request) {
       );
     }
 
+    const resolvedModel: ModelOption = isModelOption(model) ? model : DEFAULT_MODEL;
+    const resolvedTemperature =
+      typeof temperature === 'number' && temperature >= 0 && temperature <= 1
+        ? temperature
+        : DEFAULT_TEMPERATURE;
+
     const config = CALLBOT_CONFIGS[sector];
     const resolvedVoiceId = voiceId || DEFAULT_VOICE_BY_PERSONA[sector];
-    const result = await deployToVapi(
-      config,
-      businessInfo || {},
-      resolvedVoiceId,
-      enrichedContext,
-    );
+    const result = await deployToVapi(config, businessInfo || {}, resolvedVoiceId, enrichedContext, {
+      systemPrompt,
+      model: resolvedModel,
+      temperature: resolvedTemperature,
+    });
 
     return NextResponse.json(
       {

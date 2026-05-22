@@ -1,6 +1,6 @@
 # CallBot Generator V2
 
-Builder Next.js 15 pour créer et tester des assistants vocaux Vapi multi-secteurs (restaurant, coiffeur, dentaire, immobilier, e-commerce). Wizard 4 étapes, enrichissement business automatique via DataForSEO + Claude Sonnet, switcher de voix A/B en direct (Cartesia, ElevenLabs).
+Builder Next.js 16 pour créer et tester des assistants vocaux Vapi multi-secteurs (restaurant, coiffeur, dentaire, immobilier, e-commerce). Wizard 4 étapes, enrichissement business automatique via DataForSEO + Claude Sonnet, switcher de voix A/B en direct (Cartesia, ElevenLabs).
 
 ## Personas
 
@@ -94,12 +94,6 @@ node scripts/patch-vapi-assistant.js     # patch ad-hoc d'un bot live (édite l'
 - Le switch de voix passe par le proxy serveur `/api/switch-voice` qui maintient une allowlist de presets : le client ne peut envoyer qu'un `presetId`, jamais un objet voix arbitraire
 - Endpoints renvoient `503` si une env var critique manque (pas de crash silencieux)
 - Webhook Vapi vérifié par HMAC via `VAPI_WEBHOOK_SECRET`
-
-## Legacy
-
-Quelques fichiers du repo initial sont conservés à la racine pour rétro-compatibilité (scripts CLI Node : `generator.js`, `mindy-generator.js`, `package-bots.js`, `vapi-config-generator.js`, `deploy-vapi-real.js`, `fix-cartesia.js`, dossiers `core/` et `templates/`). Ils ne sont pas utilisés par l'app Next.js et seront supprimés en Release 2.
-
-`public/deploy-interface.html` (ancienne UI statique) reste servi comme fallback à `/deploy-interface.html`.
 
 ---
 

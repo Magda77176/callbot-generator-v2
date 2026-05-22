@@ -38,58 +38,127 @@ function vapiModelConfig(option: ModelOption): { provider: string; model: string
   }
 }
 
-function buildToolsForSector(sector: Sector, webhookUrl: string) {
-  if (sector !== 'restaurant') return [];
-  return [
-    {
-      type: 'function',
-      function: {
-        name: 'record_reservation',
-        description:
-          "Enregistre une réservation confirmée par le client. À appeler UNIQUEMENT après que tous les champs ont été reconfirmés à voix haute. C'est cet appel qui sauvegarde la réservation côté restaurateur — tant qu'il n'a pas eu lieu, la réservation n'existe pas.",
-        parameters: {
-          type: 'object',
-          properties: {
-            date: {
-              type: 'string',
-              description: 'Date de la réservation au format ISO AAAA-MM-JJ (ex. 2026-05-25)',
-            },
-            time: {
-              type: 'string',
-              description: "Heure de la réservation au format 24h HH:MM (ex. 19:30 pour sept heures et demie du soir)",
-            },
-            partySize: {
-              type: 'integer',
-              description: 'Nombre de personnes (entier ≥ 1)',
-              minimum: 1,
-            },
-            customerName: {
-              type: 'string',
-              description: 'Nom du client tel que reconfirmé à voix haute',
-            },
-            customerPhone: {
-              type: 'string',
-              description: 'Numéro français à 10 chiffres formaté "06 12 34 56 78"',
-            },
-            dietaryNotes: {
-              type: 'string',
-              description: 'Allergies, régimes spéciaux mentionnés. Chaîne vide si rien.',
-            },
-            specialRequests: {
-              type: 'string',
-              description:
-                'Demandes particulières (anniversaire, table fenêtre, accès PMR…). Chaîne vide si rien.',
-            },
+function reservationToolSpec(webhookUrl: string) {
+  return {
+    type: 'function',
+    function: {
+      name: 'record_reservation',
+      description:
+        "Enregistre une réservation confirmée par le client. À appeler UNIQUEMENT après que tous les champs ont été reconfirmés à voix haute. C'est cet appel qui sauvegarde la réservation côté restaurateur — tant qu'il n'a pas eu lieu, la réservation n'existe pas.",
+      parameters: {
+        type: 'object',
+        properties: {
+          date: {
+            type: 'string',
+            description: 'Date de la réservation au format ISO AAAA-MM-JJ (ex. 2026-05-25)',
           },
-          required: ['date', 'time', 'partySize', 'customerName', 'customerPhone'],
+          time: {
+            type: 'string',
+            description:
+              "Heure de la réservation au format 24h HH:MM (ex. 19:30 pour sept heures et demie du soir)",
+          },
+          partySize: {
+            type: 'integer',
+            description: 'Nombre de personnes (entier ≥ 1)',
+            minimum: 1,
+          },
+          customerName: {
+            type: 'string',
+            description: 'Nom du client tel que reconfirmé à voix haute',
+          },
+          customerPhone: {
+            type: 'string',
+            description: 'Numéro français à 10 chiffres formaté "06 12 34 56 78"',
+          },
+          dietaryNotes: {
+            type: 'string',
+            description: 'Allergies, régimes spéciaux mentionnés. Chaîne vide si rien.',
+          },
+          specialRequests: {
+            type: 'string',
+            description:
+              'Demandes particulières (anniversaire, table fenêtre, accès PMR…). Chaîne vide si rien.',
+          },
         },
-      },
-      server: {
-        url: webhookUrl,
-        secret: process.env.VAPI_WEBHOOK_SECRET,
+        required: ['date', 'time', 'partySize', 'customerName', 'customerPhone'],
       },
     },
-  ];
+    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET },
+  };
+}
+
+function leadToolSpec(webhookUrl: string) {
+  return {
+    type: 'function',
+    function: {
+      name: 'record_lead',
+      description:
+        "Enregistre un lead immobilier qualifié. À appeler UNIQUEMENT après collecte des infos qualifiantes et reconfirmation orale du nom et du téléphone. C'est cet appel qui transmet le lead à l'agence pour rappel.",
+      parameters: {
+        type: 'object',
+        properties: {
+          leadType: {
+            type: 'string',
+            enum: ['buyer', 'renter', 'seller', 'estimation', 'other'],
+            description:
+              "Catégorie : buyer=acheteur, renter=locataire, seller=vendeur, estimation=demande d'estimation, other=autre",
+          },
+          customerName: {
+            type: 'string',
+            description: 'Nom complet du contact tel que reconfirmé à voix haute',
+          },
+          customerPhone: {
+            type: 'string',
+            description: 'Numéro français à 10 chiffres formaté "06 12 34 56 78"',
+          },
+          propertyType: {
+            type: 'string',
+            description: 'Type de bien (appartement, maison, terrain, local). Vide si non pertinent.',
+          },
+          zones: {
+            type: 'string',
+            description:
+              'Zones recherchées (acheteur/locataire) OU adresse précise du bien (vendeur/estimation)',
+          },
+          budget: {
+            type: 'string',
+            description: "Budget en clair, ex. \"300 à 400 000 euros\" ou \"1200 euros par mois\"",
+          },
+          rooms: {
+            type: 'integer',
+            description: 'Nombre de pièces souhaitées. 0 si non précisé.',
+            minimum: 0,
+          },
+          timing: {
+            type: 'string',
+            description: 'Timing du projet ("urgent", "3 mois", "6 mois", "pas pressé"…)',
+          },
+          mustHaves: {
+            type: 'string',
+            description: 'Critères importants en clair texte (extérieur, parking…). Vide si rien.',
+          },
+          notes: {
+            type: 'string',
+            description:
+              "Autres infos pertinentes (état du bien, financement déjà obtenu, contexte spécial). Vide si rien.",
+          },
+        },
+        required: ['leadType', 'customerName', 'customerPhone'],
+      },
+    },
+    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET },
+  };
+}
+
+function buildToolsForSector(sector: Sector, webhookUrl: string) {
+  switch (sector) {
+    case 'restaurant':
+      return [reservationToolSpec(webhookUrl)];
+    case 'immobilier':
+      return [leadToolSpec(webhookUrl)];
+    default:
+      return [];
+  }
 }
 
 interface DeployRequestBody {

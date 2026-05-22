@@ -33,6 +33,31 @@ interface ReservationArgs {
   specialRequests?: string;
 }
 
+type LeadType = 'buyer' | 'renter' | 'seller' | 'estimation' | 'other';
+
+const LEAD_TYPES: readonly LeadType[] = ['buyer', 'renter', 'seller', 'estimation', 'other'];
+
+const LEAD_TYPE_LABEL: Record<LeadType, string> = {
+  buyer: 'Acheteur',
+  renter: 'Locataire',
+  seller: 'Vendeur',
+  estimation: 'Demande d’estimation',
+  other: 'Autre demande',
+};
+
+interface LeadArgs {
+  leadType: LeadType;
+  customerName: string;
+  customerPhone: string;
+  propertyType?: string;
+  zones?: string;
+  budget?: string;
+  rooms?: number;
+  timing?: string;
+  mustHaves?: string;
+  notes?: string;
+}
+
 function parseArgs(raw: string | Record<string, unknown> | undefined): Record<string, unknown> {
   if (!raw) return {};
   if (typeof raw === 'object') return raw;
@@ -42,6 +67,27 @@ function parseArgs(raw: string | Record<string, unknown> | undefined): Record<st
     return {};
   }
 }
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return map[c] ?? c;
+  });
+}
+
+function optionalRow(label: string, value?: string): string {
+  return value && value.trim()
+    ? `<p><strong>${label} :</strong> ${escapeHtml(value)}</p>`
+    : '';
+}
+
+// ----------------------------- reservation -----------------------------
 
 function validateReservation(
   args: Record<string, unknown>,
@@ -75,53 +121,38 @@ function validateReservation(
   };
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    };
-    return map[c] ?? c;
-  });
-}
-
-function buildEmailHtml(r: ReservationArgs, restaurantName: string): string {
-  const optional = (label: string, value?: string) =>
-    value && value.trim() ? `<p><strong>${label} :</strong> ${escapeHtml(value)}</p>` : '';
-  return `<h2 style="margin:0 0 16px;">Nouvelle réservation — ${escapeHtml(restaurantName)}</h2>
+function buildReservationEmailHtml(r: ReservationArgs, businessName: string): string {
+  return `<h2 style="margin:0 0 16px;">Nouvelle réservation — ${escapeHtml(businessName)}</h2>
 <p><strong>Date :</strong> ${escapeHtml(formatFrenchDate(r.date))}</p>
 <p><strong>Heure :</strong> ${escapeHtml(r.time)}</p>
 <p><strong>Personnes :</strong> ${r.partySize}</p>
 <p><strong>Client :</strong> ${escapeHtml(r.customerName)}</p>
 <p><strong>Téléphone :</strong> ${escapeHtml(r.customerPhone)}</p>
-${optional('Régime / allergies', r.dietaryNotes)}
-${optional('Demandes particulières', r.specialRequests)}
+${optionalRow('Régime / allergies', r.dietaryNotes)}
+${optionalRow('Demandes particulières', r.specialRequests)}
 <p style="color:#888;font-size:12px;margin-top:24px;">Reçu via Marco (callbot vocal).</p>`;
 }
 
-function buildSmsContent(r: ReservationArgs, restaurantName: string): string {
+function buildReservationSmsContent(r: ReservationArgs, businessName: string): string {
   const firstName = r.customerName.trim().split(/\s+/)[0] ?? r.customerName;
   const niceTime = r.time.replace(':', 'h');
-  return `Bonjour ${firstName}, votre résa au ${restaurantName} pour ${r.partySize} pers. le ${formatFrenchDate(r.date)} à ${niceTime} est confirmée. Merci !`;
+  return `Bonjour ${firstName}, votre résa au ${businessName} pour ${r.partySize} pers. le ${formatFrenchDate(r.date)} à ${niceTime} est confirmée. Merci !`;
 }
 
-async function deliverConfirmations(r: ReservationArgs): Promise<void> {
-  const restaurateurEmail = process.env.RESTAURATEUR_EMAIL;
-  const restaurantName = process.env.RESTAURANT_NAME || 'votre restaurant';
+async function deliverReservationConfirmations(r: ReservationArgs): Promise<void> {
+  const notificationEmail = process.env.NOTIFICATION_EMAIL;
+  const businessName = process.env.BUSINESS_NAME || 'votre établissement';
 
   const tasks: Promise<unknown>[] = [];
 
-  if (restaurateurEmail) {
+  if (notificationEmail) {
     tasks.push(
       sendEmail({
-        to: restaurateurEmail,
+        to: notificationEmail,
         subject: `Nouvelle résa — ${r.customerName} (${r.partySize} pers.)`,
-        htmlBody: buildEmailHtml(r, restaurantName),
+        htmlBody: buildReservationEmailHtml(r, businessName),
       }).then((res) => {
-        if (!res.ok) console.warn('[vapi-webhook] email failed', res);
+        if (!res.ok) console.warn('[vapi-webhook] reservation email failed', res);
       }),
     );
   }
@@ -129,16 +160,122 @@ async function deliverConfirmations(r: ReservationArgs): Promise<void> {
   const e164 = toE164French(r.customerPhone);
   if (e164) {
     tasks.push(
-      sendSms({ to: e164, content: buildSmsContent(r, restaurantName) }).then((res) => {
-        if (!res.ok) console.warn('[vapi-webhook] sms failed', res);
+      sendSms({ to: e164, content: buildReservationSmsContent(r, businessName) }).then((res) => {
+        if (!res.ok) console.warn('[vapi-webhook] reservation sms failed', res);
       }),
     );
   } else {
-    console.warn('[vapi-webhook] sms skipped: invalid French phone format', r.customerPhone);
+    console.warn('[vapi-webhook] reservation sms skipped: invalid French phone', r.customerPhone);
   }
 
   await Promise.allSettled(tasks);
 }
+
+// -------------------------------- lead --------------------------------
+
+function isLeadType(value: unknown): value is LeadType {
+  return typeof value === 'string' && (LEAD_TYPES as readonly string[]).includes(value);
+}
+
+function validateLead(
+  args: Record<string, unknown>,
+): { ok: true; value: LeadArgs } | { ok: false; error: string } {
+  if (!isLeadType(args.leadType)) {
+    return { ok: false, error: `leadType invalide (reçu: ${args.leadType})` };
+  }
+  const required = ['customerName', 'customerPhone'];
+  const missing = required.filter((k) => !args[k] || String(args[k]).trim() === '');
+  if (missing.length > 0) return { ok: false, error: `Champs manquants: ${missing.join(', ')}` };
+
+  const roomsRaw = args.rooms;
+  let rooms: number | undefined;
+  if (roomsRaw !== undefined && roomsRaw !== null && roomsRaw !== '') {
+    const n = Number(roomsRaw);
+    if (Number.isInteger(n) && n >= 0) rooms = n;
+  }
+
+  const opt = (k: string) => {
+    const v = args[k];
+    if (v === undefined || v === null) return undefined;
+    const s = String(v).trim();
+    return s ? s : undefined;
+  };
+
+  return {
+    ok: true,
+    value: {
+      leadType: args.leadType,
+      customerName: String(args.customerName).trim(),
+      customerPhone: String(args.customerPhone).trim(),
+      propertyType: opt('propertyType'),
+      zones: opt('zones'),
+      budget: opt('budget'),
+      rooms,
+      timing: opt('timing'),
+      mustHaves: opt('mustHaves'),
+      notes: opt('notes'),
+    },
+  };
+}
+
+function buildLeadEmailHtml(l: LeadArgs, businessName: string): string {
+  return `<h2 style="margin:0 0 16px;">Nouveau lead immo — ${escapeHtml(businessName)}</h2>
+<p><strong>Type :</strong> ${escapeHtml(LEAD_TYPE_LABEL[l.leadType])}</p>
+${optionalRow('Type de bien', l.propertyType)}
+${optionalRow(l.leadType === 'seller' || l.leadType === 'estimation' ? 'Adresse du bien' : 'Zones recherchées', l.zones)}
+${optionalRow('Budget', l.budget)}
+${l.rooms !== undefined ? `<p><strong>Pièces :</strong> ${l.rooms}</p>` : ''}
+${optionalRow('Timing', l.timing)}
+${optionalRow('Critères', l.mustHaves)}
+${optionalRow('Notes', l.notes)}
+<p><strong>Contact :</strong> ${escapeHtml(l.customerName)}</p>
+<p><strong>Téléphone :</strong> ${escapeHtml(l.customerPhone)}</p>
+<p style="color:#888;font-size:12px;margin-top:24px;">Reçu via Alex (callbot vocal). À rappeler sous 24h.</p>`;
+}
+
+function buildLeadSmsContent(l: LeadArgs, businessName: string): string {
+  const firstName = l.customerName.trim().split(/\s+/)[0] ?? l.customerName;
+  return `Bonjour ${firstName}, votre demande a bien été enregistrée par ${businessName}. Un conseiller vous rappelle sous 24h. Merci.`;
+}
+
+function leadSubject(l: LeadArgs): string {
+  const detail = l.budget ? ` — ${l.budget}` : '';
+  return `Nouveau lead immo — ${l.customerName} (${LEAD_TYPE_LABEL[l.leadType].toLowerCase()})${detail}`;
+}
+
+async function deliverLeadConfirmations(l: LeadArgs): Promise<void> {
+  const notificationEmail = process.env.NOTIFICATION_EMAIL;
+  const businessName = process.env.BUSINESS_NAME || 'notre agence';
+
+  const tasks: Promise<unknown>[] = [];
+
+  if (notificationEmail) {
+    tasks.push(
+      sendEmail({
+        to: notificationEmail,
+        subject: leadSubject(l),
+        htmlBody: buildLeadEmailHtml(l, businessName),
+      }).then((res) => {
+        if (!res.ok) console.warn('[vapi-webhook] lead email failed', res);
+      }),
+    );
+  }
+
+  const e164 = toE164French(l.customerPhone);
+  if (e164) {
+    tasks.push(
+      sendSms({ to: e164, content: buildLeadSmsContent(l, businessName) }).then((res) => {
+        if (!res.ok) console.warn('[vapi-webhook] lead sms failed', res);
+      }),
+    );
+  } else {
+    console.warn('[vapi-webhook] lead sms skipped: invalid French phone', l.customerPhone);
+  }
+
+  await Promise.allSettled(tasks);
+}
+
+// ------------------------------ dispatch ------------------------------
 
 async function handleToolCall(
   call: VapiToolCall,
@@ -146,22 +283,31 @@ async function handleToolCall(
 ): Promise<{ toolCallId: string; result: string }> {
   const toolCallId = call.id ?? 'unknown';
   const name = call.function?.name;
-
-  if (name !== 'record_reservation') {
-    return { toolCallId, result: `Fonction inconnue: ${name}` };
-  }
-
   const parsed = parseArgs(call.function?.arguments);
-  const validated = validateReservation(parsed);
 
-  if (!validated.ok) {
-    console.warn(`[vapi-webhook] record_reservation rejected: ${validated.error}`, { callId, parsed });
-    return { toolCallId, result: `Erreur d'enregistrement: ${validated.error}` };
+  if (name === 'record_reservation') {
+    const validated = validateReservation(parsed);
+    if (!validated.ok) {
+      console.warn(`[vapi-webhook] record_reservation rejected: ${validated.error}`, { callId, parsed });
+      return { toolCallId, result: `Erreur d'enregistrement: ${validated.error}` };
+    }
+    console.log('[vapi-webhook] reservation', { callId, ...validated.value });
+    await deliverReservationConfirmations(validated.value);
+    return { toolCallId, result: 'Réservation enregistrée avec succès.' };
   }
 
-  console.log('[vapi-webhook] reservation', { callId, ...validated.value });
-  await deliverConfirmations(validated.value);
-  return { toolCallId, result: 'Réservation enregistrée avec succès.' };
+  if (name === 'record_lead') {
+    const validated = validateLead(parsed);
+    if (!validated.ok) {
+      console.warn(`[vapi-webhook] record_lead rejected: ${validated.error}`, { callId, parsed });
+      return { toolCallId, result: `Erreur d'enregistrement: ${validated.error}` };
+    }
+    console.log('[vapi-webhook] lead', { callId, ...validated.value });
+    await deliverLeadConfirmations(validated.value);
+    return { toolCallId, result: 'Lead enregistré, un conseiller rappellera sous vingt-quatre heures.' };
+  }
+
+  return { toolCallId, result: `Fonction inconnue: ${name}` };
 }
 
 export async function POST(req: NextRequest) {

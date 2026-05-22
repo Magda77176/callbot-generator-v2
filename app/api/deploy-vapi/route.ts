@@ -196,7 +196,9 @@ async function deployToVapi(
     : buildPersonalizedPrompt(config, businessInfo, enrichedContext);
   const systemPrompt = rawPrompt.replace(/\{\{business_name\}\}/g, businessName);
 
-  const webhookUrl = process.env.VAPI_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
+  // .trim() guards against accidental trailing whitespace/newline when the env var
+  // is pasted into the Vercel dashboard. Vapi rejects URLs with any control chars.
+  const webhookUrl = (process.env.VAPI_WEBHOOK_URL || DEFAULT_WEBHOOK_URL).trim();
   const tools = buildToolsForSector(config.sector, webhookUrl);
 
   const payload = {

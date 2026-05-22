@@ -7,8 +7,9 @@ import {
   type CallbotConfig,
 } from '@/lib/callbot-configs';
 import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
+import { checkLimit, clientIp, deployLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 
-const WEBHOOK_URL = 'https://webhook.homepop.fr/webhook/vapi';
+const DEFAULT_WEBHOOK_URL = 'https://webhook.homepop.fr/webhook/vapi';
 const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
 
 interface DeployRequestBody {
@@ -54,7 +55,7 @@ async function deployToVapi(
       language: 'fr',
     },
     server: {
-      url: WEBHOOK_URL,
+      url: process.env.VAPI_WEBHOOK_URL || DEFAULT_WEBHOOK_URL,
       secret: process.env.VAPI_WEBHOOK_SECRET,
     },
     backchannelingEnabled: true,
@@ -86,7 +87,15 @@ export async function POST(request: Request) {
   if (!process.env.VAPI_API_KEY || !process.env.VAPI_WEBHOOK_SECRET) {
     return NextResponse.json(
       { success: false, error: 'Configuration serveur incomplète (env vars manquantes)' },
-      { status: 500 },
+      { status: 503 },
+    );
+  }
+
+  const decision = await checkLimit(deployLimiter, clientIp(request));
+  if (!decision.allowed) {
+    return NextResponse.json(
+      { success: false, error: 'Trop de déploiements. Réessaie dans quelques minutes.' },
+      { status: 429, headers: rateLimitHeaders(decision) },
     );
   }
 
@@ -113,14 +122,17 @@ export async function POST(request: Request) {
       enrichedContext,
     );
 
-    return NextResponse.json({
-      success: true,
-      assistantId: result.id,
-      phoneNumber: result.phoneNumber || "En cours d'attribution...",
-      sector,
-      assistantName: config.name,
-      businessName: businessInfo?.name || 'Non défini',
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        assistantId: result.id,
+        phoneNumber: result.phoneNumber || "En cours d'attribution...",
+        sector,
+        assistantName: config.name,
+        businessName: businessInfo?.name || 'Non défini',
+      },
+      { headers: rateLimitHeaders(decision) },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erreur inconnue';
     console.error('❌ Erreur déploiement Vapi:', message);

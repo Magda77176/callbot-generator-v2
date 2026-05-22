@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { enrichBusinessContext } from '@/lib/context-enricher';
+import { checkLimit, clientIp, enrichLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 
 interface EnrichRequestBody {
   businessName?: string;
@@ -14,6 +15,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { success: false, error: 'ANTHROPIC_API_KEY manquante côté serveur' },
       { status: 503 },
+    );
+  }
+
+  const decision = await checkLimit(enrichLimiter, clientIp(request));
+  if (!decision.allowed) {
+    return NextResponse.json(
+      { success: false, error: 'Trop de requêtes. Réessaie dans quelques minutes.' },
+      { status: 429, headers: rateLimitHeaders(decision) },
     );
   }
 
@@ -34,7 +43,7 @@ export async function POST(request: Request) {
       instagram,
       menu,
     });
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: rateLimitHeaders(decision) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

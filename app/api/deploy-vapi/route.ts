@@ -219,6 +219,14 @@ async function deployToVapi(
       provider: 'deepgram',
       model: 'nova-2',
       language: 'fr',
+      // Critical for phone-number reliability: numerals=true forces Deepgram
+      // to emit "39" instead of "trente-neuf" (eliminates the phonetic
+      // ambiguity between trente-et-un / trente-neuf etc). smartFormat
+      // handles general number formatting. endpointing=300 leaves enough
+      // silence for the speaker to finish digit sequences without being cut.
+      numerals: true,
+      smartFormat: true,
+      endpointing: 300,
     },
     server: {
       url: webhookUrl,

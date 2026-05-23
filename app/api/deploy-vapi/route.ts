@@ -232,9 +232,22 @@ async function deployToVapi(
   // assistant then references them via model.toolIds. Yes, this means a fresh
   // tool record per deploy — cleanup is a future concern, parity with one
   // prospect first.
-  const toolIds = toolSpecs.length
+  const dynamicToolIds = toolSpecs.length
     ? await Promise.all(toolSpecs.map((spec) => createVapiTool(spec, apiKey)))
     : [];
+
+  // Pre-existing Vapi tools (Google Calendar built-ins created by the user in
+  // the Vapi dashboard with their own OAuth connection). For immobilier we
+  // pull the IDs from env so the bot can check availability and book visits.
+  const staticToolIds: string[] = [];
+  if (config.sector === 'immobilier') {
+    const availabilityId = process.env.VAPI_TOOL_AVAILABILITY_ID?.trim();
+    const eventId = process.env.VAPI_TOOL_EVENT_ID?.trim();
+    if (availabilityId) staticToolIds.push(availabilityId);
+    if (eventId) staticToolIds.push(eventId);
+  }
+
+  const toolIds = [...dynamicToolIds, ...staticToolIds];
 
   const payload = {
     name: `${config.name} - ${businessInfo.name || 'CallBot'}`,

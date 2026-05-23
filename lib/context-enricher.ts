@@ -1,7 +1,30 @@
 import Anthropic from '@anthropic-ai/sdk';
 import * as cheerio from 'cheerio';
+import type { Sector } from './callbot-configs';
 import { searchBusinessByName, type DataForSeoResult } from './dataforseo-client';
 import { detectInputType } from './input-detector';
+
+// Regex matching common French real-estate listing path patterns. Catches:
+// /biens, /bien-a-vendre, /annonces, /annonce, /a-vendre, /a-louer,
+// /vente, /location, /achat, /nos-biens, /immobilier-vente, /portfolio, /listings.
+const IMMO_LISTING_PATH = /\/(biens?|annonces?|a-vendre|a-louer|vente|location|achat|nos-biens|immobilier-vente|immobilier-location|portfolio|listings|catalogue)(\/|$|\?|#)/i;
+
+export function findImmoListingLinks(html: string, baseUrl: string): string[] {
+  const $ = cheerio.load(html);
+  const urls = new Set<string>();
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (!href || !IMMO_LISTING_PATH.test(href)) return;
+    try {
+      const abs = new URL(href, baseUrl).toString();
+      if (!/^https?:/.test(abs)) return;
+      urls.add(abs.split('#')[0]);
+    } catch {
+      /* invalid URL, skip */
+    }
+  });
+  return Array.from(urls).slice(0, 5);
+}
 
 export interface EnrichmentSources {
   primary: string;
@@ -46,9 +69,60 @@ async function scrapeDirect(url: string, maxChars = 12000): Promise<string> {
   return $('body').text().replace(/\s+/g, ' ').trim().slice(0, maxChars);
 }
 
+// Like scrapeDirect but also returns the raw HTML so callers can mine it for
+// listing links before the link-bearing nav/footer get stripped.
+async function scrapeDirectWithHtml(
+  url: string,
+  maxChars = 12000,
+): Promise<{ text: string; html: string }> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Ottomatisation Enricher)' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+  const $ = cheerio.load(html);
+  $('script, style, noscript, iframe, nav, footer, header').remove();
+  const text = $('body').text().replace(/\s+/g, ' ').trim().slice(0, maxChars);
+  return { text, html };
+}
+
+// Iterates over up-to-5 listing URLs (extracted from the agency homepage HTML)
+// and scrapes each into `scraped` as listings_1, listings_2, etc.
+async function crawlImmoListings(
+  baseHtml: string,
+  baseUrl: string,
+  scraped: Record<string, string>,
+  status: SourceStatus[],
+): Promise<void> {
+  const listingUrls = findImmoListingLinks(baseHtml, baseUrl);
+  for (let i = 0; i < listingUrls.length; i++) {
+    const url = listingUrls[i];
+    const pathDisplay = (() => {
+      try {
+        return new URL(url).pathname;
+      } catch {
+        return url;
+      }
+    })();
+    try {
+      const content = await scrapeDirect(url, 10000);
+      scraped[`listings_${i + 1}`] = content;
+      status.push({ type: 'Annonces', ok: true, details: pathDisplay });
+    } catch (e) {
+      status.push({
+        type: 'Annonces',
+        ok: false,
+        error: `${pathDisplay} : ${(e as Error).message}`,
+      });
+    }
+  }
+}
+
 export async function enrichBusinessContext(
   businessName: string,
   sources: EnrichmentSources,
+  sector?: Sector,
 ): Promise<EnrichmentResult> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -102,10 +176,19 @@ export async function enrichBusinessContext(
           details: d.title || 'Fiche trouvée',
         });
 
-        // 2. Si la fiche GMB contient un site web, on tente de le scraper aussi
+        // 2. Si la fiche GMB contient un site web, on tente de le scraper aussi.
+        // Pour l'immo on récupère aussi le HTML brut pour pouvoir miner les liens
+        // vers les pages d'annonces.
         if (d.url) {
+          let gmbWebsiteHtml: string | null = null;
           try {
-            scraped.website_from_gmb = await scrapeDirect(d.url);
+            if (sector === 'immobilier') {
+              const direct = await scrapeDirectWithHtml(d.url);
+              scraped.website_from_gmb = direct.text;
+              gmbWebsiteHtml = direct.html;
+            } else {
+              scraped.website_from_gmb = await scrapeDirect(d.url);
+            }
             result.sourcesStatus.push({ type: 'Site web (depuis GMB)', ok: true });
           } catch {
             try {
@@ -118,6 +201,9 @@ export async function enrichBusinessContext(
                 error: 'Inaccessible',
               });
             }
+          }
+          if (sector === 'immobilier' && gmbWebsiteHtml) {
+            await crawlImmoListings(gmbWebsiteHtml, d.url, scraped, result.sourcesStatus);
           }
         }
 
@@ -172,8 +258,15 @@ export async function enrichBusinessContext(
   if (directScrapeTypes.includes(detected.type)) {
     try {
       let content = '';
+      let primaryHtml: string | null = null;
       try {
-        content = await scrapeDirect(detected.value);
+        if (sector === 'immobilier') {
+          const direct = await scrapeDirectWithHtml(detected.value);
+          content = direct.text;
+          primaryHtml = direct.html;
+        } else {
+          content = await scrapeDirect(detected.value);
+        }
       } catch {
         content = await scrapeViaJina(detected.value);
       }
@@ -183,6 +276,9 @@ export async function enrichBusinessContext(
         ok: true,
         details: `${content.length} car.`,
       });
+      if (sector === 'immobilier' && primaryHtml) {
+        await crawlImmoListings(primaryHtml, detected.value, scraped, result.sourcesStatus);
+      }
     } catch (e) {
       result.sourcesStatus.push({
         type: `URL ${detected.type}`,
@@ -241,20 +337,81 @@ export async function enrichBusinessContext(
       .map(([k, v]) => `## SOURCE: ${k.toUpperCase()}\n${v}`)
       .join('\n\n---\n\n');
 
+    const promptContent = buildSynthesisPrompt(
+      businessName,
+      sector,
+      detected.extractedName,
+      sourcesBlock,
+    );
     const msg = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
-      messages: [
-        {
-          role: 'user',
-          content: `Tu es un assistant qui synthétise des informations business pour alimenter un CallBot vocal IA français.
+      messages: [{ role: 'user', content: promptContent }],
+    });
 
-NOM DE L'ÉTABLISSEMENT : ${businessName || detected.extractedName || 'non précisé'}
+    const content = msg.content[0];
+    if (content.type === 'text') {
+      result.contextSummary = content.text;
+      result.success = true;
+    }
+  } catch (e) {
+    console.error('Anthropic synthesis failed:', e);
+  }
+
+  result.dataforseo = dataforseoData;
+  result.cost = {
+    dataforseo: dataforseoData?.rawCost || 0,
+    anthropic: 0,
+  };
+  return result;
+}
+
+function buildSynthesisPrompt(
+  businessName: string,
+  sector: Sector | undefined,
+  detectedName: string | undefined,
+  sourcesBlock: string,
+): string {
+  const header = `Tu es un assistant qui synthétise des informations business pour alimenter un CallBot vocal IA français.
+
+NOM DE L'ÉTABLISSEMENT : ${businessName || detectedName || 'non précisé'}
 
 SOURCES BRUTES COLLECTÉES :
 ${sourcesBlock}
 
-Rédige une section "CONTEXTE BUSINESS RÉEL" en prose française naturelle (pas de bullets, pas de listes, pas de markdown), qui synthétise TOUT ce que le CallBot doit savoir pour être crédible au téléphone :
+`;
+
+  if (sector === 'immobilier') {
+    return (
+      header +
+      `Rédige une section "CONTEXTE BUSINESS RÉEL" en prose française naturelle (pas de bullets, pas de listes, pas de markdown), qui synthétise pour un CallBot vocal d'agence immobilière :
+- Type d'agence (transaction, location, neuf, syndic, gestion locative, mixte...)
+- Zone(s) géographique(s) d'intervention (villes, départements, secteurs précis)
+- Spécialités (résidentiel, commercial, neuf, ancien, haut-de-gamme...)
+- Services proposés (vente, achat, location, estimation gratuite, gestion locative, syndic...)
+- Honoraires si mentionnés (commission de vente, frais d'agence location)
+- Équipe (nombre d'agents, spécialités individuelles si mentionnées)
+- Garanties / labels (FNAIM, UNIS, SNPI, certifications)
+- Coordonnées (adresse de l'agence, téléphone, email, horaires)
+
+SI LES SOURCES CONTIENNENT DES ANNONCES OU BIENS DU PORTEFEUILLE (sources listings_*) :
+Tu DOIS lister de cinq à quinze biens représentatifs avec leurs caractéristiques EXACTES : prix, surface en mètres carrés, nombre de pièces, type (appartement / maison / terrain / local commercial), localisation précise (ville et quartier si dispo), disponibilité, et toute info distinctive (étage, exposition, extérieur, parking, état). Ces informations sont CRITIQUES pour que le bot puisse répondre à "vous avez un appartement à vendre à Évry vers deux cent cinquante mille euros ?" sans inventer.
+
+PRIORITÉ DES SOURCES sur les annonces :
+1. listings_* (pages d'annonces scrapées) = source de vérité ABSOLUE — recopie les biens et prix tels quels, sans paraphraser ni omettre
+2. primary_url / website_from_gmb = contexte général de l'agence
+3. avis Google / réseaux sociaux = uniquement pour la réputation et le ton
+
+N'invente JAMAIS un bien, un prix, une zone ou une disponibilité non présents dans les sources. Si une info manque, ne l'évoque pas.
+Écris de façon fluide et factuelle, max 500 mots. Commence directement par la synthèse, sans préambule.`
+    );
+  }
+
+  // restaurant (et fallback pour les autres secteurs en attendant qu'ils aient
+  // leur propre template)
+  return (
+    header +
+    `Rédige une section "CONTEXTE BUSINESS RÉEL" en prose française naturelle (pas de bullets, pas de listes, pas de markdown), qui synthétise TOUT ce que le CallBot doit savoir pour être crédible au téléphone :
 - Nature exacte de l'activité et catégorie
 - Adresse complète et moyens d'accès
 - Horaires d'ouverture précis avec jours de fermeture
@@ -274,24 +431,6 @@ PRIORITÉ DES SOURCES sur le menu :
 3. autres sources (avis, site web) = pour le contexte général uniquement, jamais pour inventer des plats ou des prix
 
 N'invente JAMAIS d'information non présente dans les sources. Si une info manque, ne l'évoque pas.
-Écris de façon fluide et factuelle, max 450 mots. Commence directement par la synthèse, sans préambule.`,
-        },
-      ],
-    });
-
-    const content = msg.content[0];
-    if (content.type === 'text') {
-      result.contextSummary = content.text;
-      result.success = true;
-    }
-  } catch (e) {
-    console.error('Anthropic synthesis failed:', e);
-  }
-
-  result.dataforseo = dataforseoData;
-  result.cost = {
-    dataforseo: dataforseoData?.rawCost || 0,
-    anthropic: 0,
-  };
-  return result;
+Écris de façon fluide et factuelle, max 450 mots. Commence directement par la synthèse, sans préambule.`
+  );
 }

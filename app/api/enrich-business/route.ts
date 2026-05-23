@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isSector } from '@/lib/callbot-configs';
 import { enrichBusinessContext } from '@/lib/context-enricher';
 import { checkLimit, clientIp, enrichLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 
@@ -8,6 +9,7 @@ interface EnrichRequestBody {
   facebook?: string;
   instagram?: string;
   menu?: string;
+  sector?: string;
 }
 
 export async function POST(request: Request) {
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as EnrichRequestBody;
-    const { businessName, primary, facebook, instagram, menu } = body;
+    const { businessName, primary, facebook, instagram, menu, sector } = body;
 
     if (!primary && !businessName) {
       return NextResponse.json(
@@ -37,12 +39,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await enrichBusinessContext(businessName || '', {
-      primary: primary || businessName || '',
-      facebook,
-      instagram,
-      menu,
-    });
+    const validatedSector = sector && isSector(sector) ? sector : undefined;
+
+    const result = await enrichBusinessContext(
+      businessName || '',
+      {
+        primary: primary || businessName || '',
+        facebook,
+        instagram,
+        menu,
+      },
+      validatedSector,
+    );
     return NextResponse.json(result, { headers: rateLimitHeaders(decision) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';

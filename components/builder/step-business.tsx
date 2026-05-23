@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { EnrichmentStatus } from '@/lib/builder-types';
-import type { BusinessInfo } from '@/lib/callbot-configs';
+import type { BusinessInfo, Sector } from '@/lib/callbot-configs';
 
 const DETECTED_TYPE_LABELS: Record<string, string> = {
   business_name: 'Nom de commerce',
@@ -43,6 +43,7 @@ interface StepBusinessPatch {
 }
 
 interface StepBusinessProps {
+  sector: Sector | null;
   businessInfo: BusinessInfo;
   primarySource: string;
   manualMenu: string;
@@ -83,6 +84,7 @@ function Field({ id, label, value, onChange, required, type = 'text', placeholde
 }
 
 export function StepBusiness({
+  sector,
   businessInfo,
   primarySource,
   manualMenu,
@@ -115,6 +117,7 @@ export function StepBusiness({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          sector,
           businessName: businessInfo.name,
           primary: primarySource,
           facebook: businessInfo.facebook,
@@ -217,23 +220,25 @@ export function StepBusiness({
           helper="Acceptés : nom seul, Google Maps, Pages Jaunes, TripAdvisor, TheFork, site web..."
         />
 
-        <div className="space-y-2">
-          <Label htmlFor="manual-menu">
-            Menu / carte (optionnel — collez votre carte ici)
-          </Label>
-          <Textarea
-            id="manual-menu"
-            value={manualMenu}
-            onChange={(e) => onChange({ manualMenu: e.target.value })}
-            rows={8}
-            placeholder={`Ex.\nEntrées :\n- Accras de morue — 8 €\n- Boudin créole — 9 €\n\nPlats :\n- Colombo de poulet — 18 €\n- Langouste grillée — 38 €\n- Brochette de saint-jacques — 24 €\n\nDesserts :\n- Blanc-manger coco — 7 €`}
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            Google ne donne pas le menu via API. Si vous le collez ici, le bot pourra citer
-            les plats et leurs prix au lieu de rester vague.
-          </p>
-        </div>
+        {sector === 'restaurant' && (
+          <div className="space-y-2">
+            <Label htmlFor="manual-menu">
+              Menu / carte (optionnel — collez votre carte ici)
+            </Label>
+            <Textarea
+              id="manual-menu"
+              value={manualMenu}
+              onChange={(e) => onChange({ manualMenu: e.target.value })}
+              rows={8}
+              placeholder={`Ex.\nEntrées :\n- Accras de morue — 8 €\n- Boudin créole — 9 €\n\nPlats :\n- Colombo de poulet — 18 €\n- Langouste grillée — 38 €\n- Brochette de saint-jacques — 24 €\n\nDesserts :\n- Blanc-manger coco — 7 €`}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Google ne donne pas le menu via API. Si vous le collez ici, le bot pourra citer
+              les plats et leurs prix au lieu de rester vague.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field

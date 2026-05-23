@@ -116,6 +116,7 @@ export default function BuilderPage() {
         )}
         {step === 1 && (
           <StepBusiness
+            sector={state.sector}
             businessInfo={state.businessInfo}
             primarySource={state.primarySource}
             manualMenu={state.manualMenu}

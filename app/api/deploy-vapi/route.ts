@@ -210,11 +210,16 @@ async function deployToVapi(
   overrides: DeployOverrides,
 ): Promise<VapiAssistantResponse> {
   const businessName = businessInfo.name || 'notre établissement';
-  // Honor the user-edited prompt if non-empty; otherwise rebuild from the persona template.
-  const rawPrompt = overrides.systemPrompt?.trim()
-    ? overrides.systemPrompt
-    : buildPersonalizedPrompt(config, businessInfo, enrichedContext);
-  const systemPrompt = rawPrompt.replace(/\{\{business_name\}\}/g, businessName);
+  // Always go through buildPersonalizedPrompt so the CONTEXTE BUSINESS RÉEL +
+  // INFORMATIONS ÉTABLISSEMENT blocks wrap the prompt. Pass overrides.systemPrompt
+  // as the base — that respects user edits from the wizard while still attaching
+  // the enriched listings/menu data the bot needs to function.
+  const systemPrompt = buildPersonalizedPrompt(
+    config,
+    businessInfo,
+    enrichedContext,
+    overrides.systemPrompt,
+  ).replace(/\{\{business_name\}\}/g, businessName);
 
   // .trim() guards against accidental trailing whitespace/newline when the env var
   // is pasted into the Vercel dashboard. Vapi rejects URLs with any control chars.

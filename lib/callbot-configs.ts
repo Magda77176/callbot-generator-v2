@@ -532,9 +532,15 @@ export function buildPersonalizedPrompt(
   config: CallbotConfig,
   business: BusinessInfo,
   enrichedContext?: string,
+  overridePrompt?: string,
 ): string {
   const businessName = business.name || 'notre établissement';
-  const basePrompt = config.systemPrompt.replace(/\{\{business_name\}\}/g, businessName);
+  // overridePrompt lets the wizard's Étape 3 customization carry through while
+  // still wrapping the prompt with CONTEXTE BUSINESS RÉEL and INFORMATIONS
+  // ÉTABLISSEMENT — without this, an edited systemPrompt would ship without
+  // any enriched listings, and Alex/Marco would be blind to the business data.
+  const base = overridePrompt?.trim() ? overridePrompt : config.systemPrompt;
+  const basePrompt = base.replace(/\{\{business_name\}\}/g, businessName);
 
   const contextHeader = enrichedContext?.trim()
     ? `## CONTEXTE BUSINESS RÉEL\n\n${enrichedContext.trim()}\n\n---\n\n`

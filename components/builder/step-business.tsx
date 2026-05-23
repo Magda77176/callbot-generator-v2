@@ -1,13 +1,10 @@
 'use client';
 
-import { Loader2, RefreshCw, Search } from 'lucide-react';
+import { Check, Loader2, RefreshCw, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { EnrichmentStatus } from '@/lib/builder-types';
 import type { BusinessInfo, Sector } from '@/lib/callbot-configs';
@@ -67,18 +64,22 @@ interface FieldProps {
 function Field({ id, label, value, onChange, required, type = 'text', placeholder, helper }: FieldProps) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>
+      <label
+        htmlFor={id}
+        className="block uppercase text-xs tracking-widest text-muted-foreground"
+      >
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </Label>
+        {required && <span className="text-default ml-1">*</span>}
+      </label>
       <Input
         id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        className="bg-background border-border h-11 rounded-md"
       />
-      {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
+      {helper && <p className="text-xs text-muted-foreground font-light">{helper}</p>}
     </div>
   );
 }
@@ -156,23 +157,23 @@ export function StepBusiness({
     }
   };
 
-  const detectedLabel = detectedType
-    ? DETECTED_TYPE_LABELS[detectedType] || detectedType
-    : null;
+  const detectedLabel = detectedType ? DETECTED_TYPE_LABELS[detectedType] || detectedType : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
-        <h2 className="text-2xl font-semibold">Informations établissement</h2>
-        <p className="text-muted-foreground mt-1">
-          Ces informations seront injectées dans le bot pour des réponses personnalisées.
+        <div className="uppercase text-xs tracking-widest text-default mb-3">— Étape 02</div>
+        <h2 className="display-section">Informations établissement</h2>
+        <p className="text-muted-foreground mt-4 font-light max-w-xl">
+          Le bot s&apos;appuie sur ces informations pour répondre avec précision et tenir un
+          discours crédible au téléphone.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Field
           id="name"
-          label="Nom établissement"
+          label="Nom de l'établissement"
           required
           value={businessInfo.name || ''}
           onChange={(v) => update('name', v)}
@@ -202,13 +203,18 @@ export function StepBusiness({
         />
       </div>
 
-      <div className="space-y-4 pt-6 border-t">
-        <div>
-          <h3 className="font-semibold">Enrichissement automatique du contexte</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Colle un nom ou un lien. On interroge DataForSEO (Google My Business) et on scrape
-            les sources additionnelles, puis Claude Sonnet synthétise le tout.
-          </p>
+      <div className="border border-border rounded-md bg-card p-6 md:p-8 space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="uppercase text-xs tracking-widest text-default mb-2">
+              Enrichissement automatique
+            </div>
+            <p className="text-sm font-light text-muted-foreground max-w-xl leading-relaxed">
+              On interroge DataForSEO (Google My Business), on scrape les sources additionnelles
+              (site, annuaires, annonces immo), puis Claude Sonnet synthétise tout en contexte
+              business.
+            </p>
+          </div>
         </div>
 
         <Field
@@ -216,34 +222,37 @@ export function StepBusiness({
           label="Nom ou lien de votre établissement"
           value={primarySource}
           onChange={(v) => onChange({ primarySource: v })}
-          placeholder="Le Ti Taurus ou https://maps.google.com/... ou https://monresto.fr"
-          helper="Acceptés : nom seul, Google Maps, Pages Jaunes, TripAdvisor, TheFork, site web..."
+          placeholder="Le Ti Taurus, https://maps.google.com/... ou https://mon-site.fr"
+          helper="Acceptés : nom seul, Google Maps, Pages Jaunes, TripAdvisor, TheFork, site web…"
         />
 
         {sector === 'restaurant' && (
           <div className="space-y-2">
-            <Label htmlFor="manual-menu">
-              Menu / carte (optionnel — collez votre carte ici)
-            </Label>
+            <label
+              htmlFor="manual-menu"
+              className="block uppercase text-xs tracking-widest text-muted-foreground"
+            >
+              Menu / carte (optionnel)
+            </label>
             <Textarea
               id="manual-menu"
               value={manualMenu}
               onChange={(e) => onChange({ manualMenu: e.target.value })}
               rows={8}
-              placeholder={`Ex.\nEntrées :\n- Accras de morue — 8 €\n- Boudin créole — 9 €\n\nPlats :\n- Colombo de poulet — 18 €\n- Langouste grillée — 38 €\n- Brochette de saint-jacques — 24 €\n\nDesserts :\n- Blanc-manger coco — 7 €`}
-              className="font-mono text-sm"
+              placeholder={`Ex.\nEntrées :\n- Accras de morue — 8 €\n- Boudin créole — 9 €\n\nPlats :\n- Colombo de poulet — 18 €\n- Langouste grillée — 38 €\n\nDesserts :\n- Blanc-manger coco — 7 €`}
+              className="bg-background border-border font-mono text-sm rounded-md"
             />
-            <p className="text-xs text-muted-foreground">
-              Google ne donne pas le menu via API. Si vous le collez ici, le bot pourra citer
-              les plats et leurs prix au lieu de rester vague.
+            <p className="text-xs text-muted-foreground font-light">
+              Google ne donne pas le menu via API. Si vous le collez ici, le bot peut citer les
+              plats et leurs prix.
             </p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Field
             id="facebook"
-            label="Facebook (optionnel)"
+            label="Facebook"
             type="url"
             value={businessInfo.facebook || ''}
             onChange={(v) => update('facebook', v)}
@@ -251,7 +260,7 @@ export function StepBusiness({
           />
           <Field
             id="instagram"
-            label="Instagram (optionnel)"
+            label="Instagram"
             type="url"
             value={businessInfo.instagram || ''}
             onChange={(v) => update('instagram', v)}
@@ -259,82 +268,87 @@ export function StepBusiness({
           />
         </div>
 
-        <div className="flex items-center justify-between gap-4 pt-2">
-          <p className="text-xs text-muted-foreground">
-            {isLoading && 'Analyse DataForSEO + synthèse Claude — 5 à 40 secondes.'}
-            {!isLoading &&
-              enrichmentStatus === 'done' &&
-              'Contexte synthétisé. Tu peux relancer si tu changes les sources.'}
-            {!isLoading && enrichmentStatus !== 'done' && 'Aucune analyse en cours.'}
+        <div className="flex items-center justify-between gap-4 pt-4 border-t border-border">
+          <p className="text-xs text-muted-foreground font-light uppercase tracking-widest">
+            {isLoading && 'Analyse en cours · 5 à 40 secondes'}
+            {!isLoading && enrichmentStatus === 'done' && 'Contexte synthétisé · relançable'}
+            {!isLoading && enrichmentStatus !== 'done' && 'En attente d\'analyse'}
           </p>
           <Button
             type="button"
             variant={enrichmentStatus === 'done' ? 'outline' : 'default'}
             onClick={handleEnrich}
             disabled={isLoading || !canEnrich}
-            className="shrink-0"
+            className="shrink-0 btn-elevated"
           >
             {isLoading ? (
               <>
-                <Loader2 className="animate-spin mr-2" size={16} />
-                Analyse en cours…
+                <Loader2 className="animate-spin" size={16} />
+                Analyse…
               </>
             ) : enrichmentStatus === 'done' ? (
               <>
-                <RefreshCw className="mr-2" size={16} />
+                <RefreshCw size={16} />
                 Relancer
               </>
             ) : (
               <>
-                <Search className="mr-2" size={16} />
-                Enrichir le contexte
+                <Search size={16} />
+                Enrichir
               </>
             )}
           </Button>
         </div>
 
         {detectedLabel && !isLoading && (
-          <div>
-            <Badge variant="secondary">Détecté : {detectedLabel}</Badge>
+          <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-default">
+            <span className="size-1.5 rounded-full bg-default" />
+            Détecté : {detectedLabel}
           </div>
         )}
 
         {sourcesStatus.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {sourcesStatus.map((s, i) => (
-              <Badge
+              <div
                 key={`${s.type}-${i}`}
-                className={
-                  s.ok
-                    ? 'bg-green-600 text-white hover:bg-green-600'
-                    : 'bg-amber-500 text-white hover:bg-amber-500'
-                }
                 title={s.error || s.details}
+                className={
+                  'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded uppercase tracking-wider font-medium ' +
+                  (s.ok
+                    ? 'bg-default/15 text-default ring-1 ring-default/30'
+                    : 'bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30')
+                }
               >
-                {s.ok ? '✓' : '⚠'} {s.type}
-                {s.details && <span className="ml-1 opacity-80">— {s.details}</span>}
-                {s.error && <span className="ml-1 opacity-80">— {s.error}</span>}
-              </Badge>
+                {s.ok ? <Check className="size-3" /> : <X className="size-3" />}
+                {s.type}
+                {s.details && <span className="opacity-70">· {s.details}</span>}
+              </div>
             ))}
           </div>
         )}
-
-        {enrichedContext && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Synthèse du contexte business</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Textarea value={enrichedContext} readOnly rows={12} className="text-sm" />
-              {cost !== null && (
-                <p className="text-xs text-muted-foreground text-right">
-                  Coût DataForSEO : ${cost.toFixed(4)}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      {enrichedContext && (
+        <div className="border border-border rounded-md bg-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="uppercase text-xs tracking-widest text-default">
+              Synthèse du contexte business
+            </div>
+            {cost !== null && (
+              <div className="text-xs text-muted-foreground font-mono">
+                Coût DataForSEO · ${cost.toFixed(4)}
+              </div>
+            )}
+          </div>
+          <Textarea
+            value={enrichedContext}
+            readOnly
+            rows={14}
+            className="bg-background border-border text-sm font-light leading-relaxed rounded-md"
+          />
+        </div>
+      )}
     </div>
   );
 }

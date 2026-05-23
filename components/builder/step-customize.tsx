@@ -1,14 +1,5 @@
 'use client';
 
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { MODEL_LABELS, type ModelOption } from '@/lib/builder-types';
@@ -58,92 +49,161 @@ export function StepCustomize({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <div>
-        <h2 className="text-2xl font-semibold">Personnalisation</h2>
-        <p className="text-muted-foreground mt-1">Ajustez le prompt, la voix et le modèle.</p>
+        <div className="uppercase text-xs tracking-widest text-default mb-3">— Étape 03</div>
+        <h2 className="display-section">Personnalisation</h2>
+        <p className="text-muted-foreground mt-4 font-light max-w-xl">
+          Ajustez le prompt système, la voix et le modèle IA. Tous les paramètres ont des valeurs
+          par défaut calibrées — vous pouvez les laisser tels quels.
+        </p>
       </div>
+
       <Tabs defaultValue="prompt" className="w-full">
-        <TabsList>
-          <TabsTrigger value="prompt">Prompt</TabsTrigger>
-          <TabsTrigger value="voice">Voix</TabsTrigger>
-          <TabsTrigger value="advanced">Avancé</TabsTrigger>
+        <TabsList className="bg-background border border-border rounded-md p-1 gap-1">
+          <TabsTrigger
+            value="prompt"
+            className="uppercase text-xs tracking-widest data-[state=active]:bg-default data-[state=active]:text-black rounded"
+          >
+            Prompt
+          </TabsTrigger>
+          <TabsTrigger
+            value="voice"
+            className="uppercase text-xs tracking-widest data-[state=active]:bg-default data-[state=active]:text-black rounded"
+          >
+            Voix
+          </TabsTrigger>
+          <TabsTrigger
+            value="advanced"
+            className="uppercase text-xs tracking-widest data-[state=active]:bg-default data-[state=active]:text-black rounded"
+          >
+            Avancé
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="prompt" className="space-y-2 mt-4">
-          <Label htmlFor="systemPrompt">Prompt système</Label>
+        <TabsContent value="prompt" className="space-y-3 mt-6">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="systemPrompt"
+              className="uppercase text-xs tracking-widest text-muted-foreground"
+            >
+              Prompt système
+            </label>
+            <span className="text-xs text-muted-foreground font-mono">
+              {systemPrompt.length} caractères
+            </span>
+          </div>
           <Textarea
             id="systemPrompt"
             value={systemPrompt}
             onChange={(e) => onChange({ systemPrompt: e.target.value })}
-            rows={18}
-            className="font-mono text-sm"
+            rows={20}
+            className="bg-background border-border font-mono text-sm rounded-md leading-relaxed"
           />
-          <p className="text-xs text-muted-foreground">
-            Les variables {'{{business_name}}'} sont remplacées au déploiement.
+          <p className="text-xs text-muted-foreground font-light">
+            La variable {'{{business_name}}'} est remplacée au déploiement par le nom de
+            l&apos;établissement.
           </p>
         </TabsContent>
 
-        <TabsContent value="voice" className="space-y-6 mt-4">
+        <TabsContent value="voice" className="space-y-8 mt-6">
           <div className="space-y-3">
-            <Label>Genre de la voix</Label>
-            <RadioGroup
-              value={gender}
-              onValueChange={(v) => v && handleGenderChange(v as VoiceGender)}
-              className="flex gap-6"
-            >
-              <label className="flex items-center gap-2 cursor-pointer">
-                <RadioGroupItem value="male" />
-                <span className="text-sm">Homme</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <RadioGroupItem value="female" />
-                <span className="text-sm">Femme</span>
-              </label>
-            </RadioGroup>
+            <label className="block uppercase text-xs tracking-widest text-muted-foreground">
+              Genre de la voix
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleGenderChange('male')}
+                className={
+                  'rounded-md border p-5 text-left transition-colors ' +
+                  (gender === 'male'
+                    ? 'border-default bg-default/5 ring-2 ring-default'
+                    : 'border-border bg-card hover:border-default/40')
+                }
+              >
+                <div className="display-light text-xl uppercase">Homme</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
+                  Voix masculine
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGenderChange('female')}
+                className={
+                  'rounded-md border p-5 text-left transition-colors ' +
+                  (gender === 'female'
+                    ? 'border-default bg-default/5 ring-2 ring-default'
+                    : 'border-border bg-card hover:border-default/40')
+                }
+              >
+                <div className="display-light text-xl uppercase">Femme</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
+                  Voix féminine
+                </div>
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="voice">Voix Cartesia</Label>
-            <Select value={voiceId} onValueChange={(v) => v && handleVoiceChange(v)}>
-              <SelectTrigger id="voice" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredVoices.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            <label
+              htmlFor="voice"
+              className="block uppercase text-xs tracking-widest text-muted-foreground"
+            >
+              Voix Cartesia
+            </label>
+            <select
+              id="voice"
+              value={voiceId}
+              onChange={(e) => handleVoiceChange(e.target.value)}
+              className="w-full h-11 px-3 rounded-md bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-default"
+            >
+              {filteredVoices.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
             {currentVoice && (
-              <p className="text-sm text-muted-foreground">{currentVoice.description}</p>
+              <p className="text-sm font-light text-muted-foreground">
+                {currentVoice.description}
+              </p>
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="advanced" className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="model">Modèle LLM</Label>
-            <Select
-              value={model}
-              onValueChange={(v) => v && onChange({ model: v as ModelOption })}
+        <TabsContent value="advanced" className="space-y-8 mt-6">
+          <div className="space-y-3">
+            <label
+              htmlFor="model"
+              className="block uppercase text-xs tracking-widest text-muted-foreground"
             >
-              <SelectTrigger id="model" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(MODEL_LABELS) as ModelOption[]).map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {MODEL_LABELS[m]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              Modèle LLM
+            </label>
+            <select
+              id="model"
+              value={model}
+              onChange={(e) => onChange({ model: e.target.value as ModelOption })}
+              className="w-full h-11 px-3 rounded-md bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-default"
+            >
+              {(Object.keys(MODEL_LABELS) as ModelOption[]).map((m) => (
+                <option key={m} value={m}>
+                  {MODEL_LABELS[m]}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="temperature">Température : {temperature.toFixed(2)}</Label>
+
+          <div className="space-y-3">
+            <div className="flex items-baseline justify-between">
+              <label
+                htmlFor="temperature"
+                className="uppercase text-xs tracking-widest text-muted-foreground"
+              >
+                Température
+              </label>
+              <span className="display-light text-3xl tabular-nums">{temperature.toFixed(2)}</span>
+            </div>
             <input
               id="temperature"
               type="range"
@@ -152,11 +212,12 @@ export function StepCustomize({
               step={0.05}
               value={temperature}
               onChange={(e) => onChange({ temperature: Number.parseFloat(e.target.value) })}
-              className="w-full accent-primary"
+              className="w-full accent-[oklch(0.65_0.19_50)]"
             />
-            <p className="text-xs text-muted-foreground">
-              0 = réponses déterministes, 1 = créatif.
-            </p>
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span>0 · déterministe</span>
+              <span>1 · créatif</span>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

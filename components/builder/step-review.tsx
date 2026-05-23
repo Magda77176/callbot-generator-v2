@@ -1,13 +1,22 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CALLBOT_CONFIGS } from '@/lib/callbot-configs';
 import { MODEL_LABELS, type BuilderState } from '@/lib/builder-types';
 import { getVoiceById } from '@/lib/voices';
 
 interface StepReviewProps {
   state: BuilderState;
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between items-baseline py-3 border-b border-border last:border-0 gap-4">
+      <span className="uppercase text-xs tracking-widest text-muted-foreground shrink-0">
+        {label}
+      </span>
+      <span className="text-sm text-right font-light min-w-0 truncate">{value || '—'}</span>
+    </div>
+  );
 }
 
 export function StepReview({ state }: StepReviewProps) {
@@ -20,98 +29,80 @@ export function StepReview({ state }: StepReviewProps) {
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <div>
-        <h2 className="text-2xl font-semibold">Résumé avant déploiement</h2>
-        <p className="text-muted-foreground mt-1">
-          Vérifiez la configuration, puis déployez sur Vapi.
+        <div className="uppercase text-xs tracking-widest text-default mb-3">— Étape 04</div>
+        <h2 className="display-section">Résumé avant déploiement</h2>
+        <p className="text-muted-foreground mt-4 font-light max-w-xl">
+          Vérifiez la configuration, puis déployez sur Vapi. Le bot sera prêt à recevoir des
+          appels en moins de 2 minutes.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Template</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium">{template.name}</p>
-            <Badge variant="secondary" className="capitalize">
-              {state.sector}
-            </Badge>
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-border bg-card p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-4">Template</div>
+          <div className="display-light text-2xl uppercase">{state.sector}</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
+            Persona {template.name}
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Établissement</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p className="font-medium">{state.businessInfo.name || '—'}</p>
-            {state.businessInfo.address && (
-              <p className="text-muted-foreground">{state.businessInfo.address}</p>
-            )}
-            {state.businessInfo.phone && (
-              <p className="text-muted-foreground">{state.businessInfo.phone}</p>
-            )}
-            {state.businessInfo.hours && (
-              <p className="text-muted-foreground">{state.businessInfo.hours}</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-border bg-card p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-4">Établissement</div>
+          <div className="space-y-2">
+            <SummaryRow label="Nom" value={state.businessInfo.name} />
+            <SummaryRow label="Adresse" value={state.businessInfo.address} />
+            <SummaryRow label="Téléphone" value={state.businessInfo.phone} />
+            <SummaryRow label="Horaires" value={state.businessInfo.hours} />
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Voix choisie</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium">{voice?.name || 'Non définie'}</p>
-            <Badge variant="secondary">
-              {state.gender === 'male' ? 'Homme' : 'Femme'}
-            </Badge>
-            {voice && (
-              <p className="text-sm text-muted-foreground">{voice.description}</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-border bg-card p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-4">Voix</div>
+          <div className="display-light text-2xl uppercase mb-1">{voice?.name || '—'}</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-widest">
+            {state.gender === 'male' ? 'Voix masculine' : 'Voix féminine'}
+          </div>
+          {voice && (
+            <p className="mt-3 text-sm font-light text-muted-foreground">{voice.description}</p>
+          )}
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Modèle</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>{MODEL_LABELS[state.model]}</p>
-            <p className="text-sm text-muted-foreground">
-              Température : {state.temperature.toFixed(2)}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-border bg-card p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-4">Modèle IA</div>
+          <div className="display-light text-2xl uppercase">{MODEL_LABELS[state.model]}</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
+            Température · {state.temperature.toFixed(2)}
+          </div>
+        </div>
       </div>
 
       {contextPreview && (
-        <details className="rounded-md border p-4 bg-muted/30">
-          <summary className="cursor-pointer font-medium">
+        <details className="rounded-md border border-border bg-card p-5 group">
+          <summary className="cursor-pointer uppercase text-xs tracking-widest text-default list-none flex justify-between items-center [&::-webkit-details-marker]:hidden">
             Contexte business enrichi (aperçu)
+            <span className="text-muted-foreground transition-transform group-open:rotate-180">↓</span>
           </summary>
-          <pre className="mt-3 text-xs whitespace-pre-wrap text-muted-foreground">
+          <pre className="mt-4 text-xs whitespace-pre-wrap text-muted-foreground font-light leading-relaxed">
             {contextPreview}
-            {state.enrichedContext && state.enrichedContext.split('\n').filter(Boolean).length > 5
+            {state.enrichedContext &&
+            state.enrichedContext.split('\n').filter(Boolean).length > 5
               ? '\n…'
               : ''}
           </pre>
         </details>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Prompt système (extrait)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <pre className="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-muted p-3 rounded font-mono">
-            {state.systemPrompt.slice(0, 600)}
-            {state.systemPrompt.length > 600 ? '…' : ''}
-          </pre>
-        </CardContent>
-      </Card>
+      <div className="rounded-md border border-border bg-card p-6">
+        <div className="uppercase text-xs tracking-widest text-default mb-4">
+          Prompt système · extrait
+        </div>
+        <pre className="text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-background border border-border p-4 rounded font-mono leading-relaxed text-muted-foreground">
+          {state.systemPrompt.slice(0, 800)}
+          {state.systemPrompt.length > 800 ? '…' : ''}
+        </pre>
+      </div>
     </div>
   );
 }

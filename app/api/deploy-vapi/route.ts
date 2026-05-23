@@ -209,7 +209,6 @@ async function deployToVapi(
       temperature: overrides.temperature,
       maxTokens: 200,
       systemPrompt,
-      ...(tools.length > 0 ? { tools } : {}),
     },
     voice: {
       provider: 'cartesia',
@@ -234,6 +233,10 @@ async function deployToVapi(
       url: webhookUrl,
       secret: process.env.VAPI_WEBHOOK_SECRET,
     },
+    // Tools at the assistant top level so Vapi routes invocations through its
+    // own webhook system. Nested in model.tools they'd be passed to OpenAI
+    // directly and Vapi wouldn't fan the call out to our server.url.
+    ...(tools.length > 0 ? { tools } : {}),
     backchannelingEnabled: true,
     backgroundDenoisingEnabled: true,
     numWordsToInterruptAssistant: 2,

@@ -310,6 +310,15 @@ async function deployToVapi(
       voiceId,
       model: 'sonic-3',
       language: 'fr',
+      // Larger chunks (60 chars vs default ~30) and sentence-end boundaries only
+      // prevent the "phrases hachées" pattern where TTS cuts mid-clause and the
+      // bot sounds like it's stuttering through sub-fragments. Marco got this
+      // tuning inline in 2c4c4cf — promoting it to the deploy default.
+      chunkPlan: {
+        enabled: true,
+        minCharacters: 60,
+        punctuationBoundaries: ['.', '!', '?'],
+      },
     },
     transcriber: {
       provider: 'deepgram',
@@ -333,7 +342,9 @@ async function deployToVapi(
     },
     backchannelingEnabled: true,
     backgroundDenoisingEnabled: true,
-    numWordsToInterruptAssistant: 2,
+    // Raised from 2 → 5 so a "oui" / "hmm" / "ah ok" doesn't interrupt the bot
+    // mid-sentence. Cuts down on phrases stopping abruptly.
+    numWordsToInterruptAssistant: 5,
     endCallPhrases: END_CALL_PHRASES,
     silenceTimeoutSeconds: 20,
     responseDelaySeconds: 0.4,

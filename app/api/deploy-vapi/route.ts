@@ -161,6 +161,27 @@ function buildToolsForSector(sector: Sector, webhookUrl: string) {
   }
 }
 
+// Vapi requires tools to be created as standalone resources first (via POST
+// /tool), then referenced from an assistant by ID (model.toolIds). Inline
+// model.tools is not supported — Vapi accepts the payload silently but
+// doesn't register the function with its server-side routing.
+async function createVapiTool(toolSpec: object, apiKey: string): Promise<string> {
+  const res = await fetch('https://api.vapi.ai/tool', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(toolSpec),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Vapi tool create failed: ${res.status} - ${errorText}`);
+  }
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
 interface DeployRequestBody {
   sector?: string;
   businessInfo?: BusinessInfo;
@@ -199,7 +220,16 @@ async function deployToVapi(
   // .trim() guards against accidental trailing whitespace/newline when the env var
   // is pasted into the Vercel dashboard. Vapi rejects URLs with any control chars.
   const webhookUrl = (process.env.VAPI_WEBHOOK_URL || DEFAULT_WEBHOOK_URL).trim();
-  const tools = buildToolsForSector(config.sector, webhookUrl);
+  const apiKey = process.env.VAPI_API_KEY?.trim() ?? '';
+  const toolSpecs = buildToolsForSector(config.sector, webhookUrl);
+
+  // Each tool must be created as a standalone resource on Vapi first; the
+  // assistant then references them via model.toolIds. Yes, this means a fresh
+  // tool record per deploy — cleanup is a future concern, parity with one
+  // prospect first.
+  const toolIds = toolSpecs.length
+    ? await Promise.all(toolSpecs.map((spec) => createVapiTool(spec, apiKey)))
+    : [];
 
   const payload = {
     name: `${config.name} - ${businessInfo.name || 'CallBot'}`,
@@ -209,11 +239,7 @@ async function deployToVapi(
       temperature: overrides.temperature,
       maxTokens: 200,
       systemPrompt,
-      // Vapi expects inline tools nested inside model.tools (not at the
-      // assistant top level — that returns 400 "property tools should not
-      // exist"). Each tool's own server.url is what routes the invocation
-      // back to our webhook.
-      ...(tools.length > 0 ? { tools } : {}),
+      ...(toolIds.length > 0 ? { toolIds } : {}),
     },
     voice: {
       provider: 'cartesia',
@@ -249,7 +275,7 @@ async function deployToVapi(
   const response = await fetch('https://api.vapi.ai/assistant', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.VAPI_API_KEY?.trim()}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),

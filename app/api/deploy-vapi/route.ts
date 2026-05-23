@@ -83,7 +83,7 @@ function reservationToolSpec(webhookUrl: string) {
         required: ['date', 'time', 'partySize', 'customerName', 'customerPhone'],
       },
     },
-    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET },
+    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET?.trim() },
   };
 }
 
@@ -146,7 +146,7 @@ function leadToolSpec(webhookUrl: string) {
         required: ['leadType', 'customerName', 'customerPhone'],
       },
     },
-    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET },
+    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET?.trim() },
   };
 }
 
@@ -231,7 +231,7 @@ async function deployToVapi(
     },
     server: {
       url: webhookUrl,
-      secret: process.env.VAPI_WEBHOOK_SECRET,
+      secret: process.env.VAPI_WEBHOOK_SECRET?.trim(),
     },
     // Tools at the assistant top level so Vapi routes invocations through its
     // own webhook system. Nested in model.tools they'd be passed to OpenAI
@@ -248,7 +248,7 @@ async function deployToVapi(
   const response = await fetch('https://api.vapi.ai/assistant', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
+      Authorization: `Bearer ${process.env.VAPI_API_KEY?.trim()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -263,7 +263,7 @@ async function deployToVapi(
 }
 
 export async function POST(request: Request) {
-  if (!process.env.VAPI_API_KEY || !process.env.VAPI_WEBHOOK_SECRET) {
+  if (!process.env.VAPI_API_KEY?.trim() || !process.env.VAPI_WEBHOOK_SECRET?.trim()) {
     return NextResponse.json(
       { success: false, error: 'Configuration serveur incomplète (env vars manquantes)' },
       { status: 503 },

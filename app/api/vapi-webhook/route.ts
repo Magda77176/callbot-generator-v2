@@ -311,7 +311,10 @@ async function handleToolCall(
 }
 
 export async function POST(req: NextRequest) {
-  const expected = process.env.VAPI_WEBHOOK_SECRET;
+  // .trim() defends against pasted env vars with trailing whitespace/newline.
+  // Vapi sends the header value as-is (HTTP strips control chars), so a stored
+  // env value of "secret\n" would never match an incoming "secret" header.
+  const expected = process.env.VAPI_WEBHOOK_SECRET?.trim();
   if (!expected) {
     return NextResponse.json({ error: 'VAPI_WEBHOOK_SECRET not configured' }, { status: 503 });
   }

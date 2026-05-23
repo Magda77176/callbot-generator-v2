@@ -122,4 +122,48 @@
       0 0 0 1px oklch(0.72 0.18 230 / 0.35),
       0 0 40px -10px oklch(0.72 0.18 230 / 0.45);
   }
+  /* Subtle grid that matches the dark theme. Used as a hero backdrop. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 30%, transparent 80%);
+  }
 }
+
+/* Slow floating gradient orbs used as hero background decoration. */
+@keyframes orb-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -30px) scale(1.1); }
+}
+@keyframes orb-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, 40px) scale(0.9); }
+}
+@keyframes orb-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, 50px) scale(1.05); }
+}
+.orb-a { animation: orb-a 14s ease-in-out infinite; }
+.orb-b { animation: orb-b 18s ease-in-out infinite; }
+.orb-c { animation: orb-c 22s ease-in-out infinite; }
+
+/* Pulsing dot used on the "live call" mock card to suggest activity. */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 oklch(0.78 0.18 145 / 0.5); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 6px oklch(0.78 0.18 145 / 0); }
+}
+.pulse-dot { animation: pulse-dot 1.8s ease-out infinite; }
+
+/* Typing dots used inside the transcript bubble while the bot "speaks". */
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.typing-dot {
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }

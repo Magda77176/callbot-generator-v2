@@ -87,35 +87,38 @@ export default function BuilderPage() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen hero-bg">
       {/* Top nav */}
-      <header className="container mx-auto max-w-5xl px-6 py-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="size-8 rounded-lg bg-primary/15 ring-1 ring-primary/30 flex items-center justify-center group-hover:ring-glow transition-shadow">
-            <Phone className="size-4 text-primary" />
-          </div>
-          <span className="font-semibold tracking-tight">CallBot</span>
-        </Link>
-        <Link
-          href="/"
-          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
-        >
-          <ChevronLeft className="size-4" />
-          Accueil
-        </Link>
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-5 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="size-8 rounded-full bg-default flex items-center justify-center">
+              <Phone className="size-3.5 text-black" />
+            </div>
+            <span className="font-semibold tracking-tight uppercase">CallBot</span>
+          </Link>
+          <Link
+            href="/"
+            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-default inline-flex items-center gap-1 transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+            Accueil
+          </Link>
+        </div>
       </header>
 
       {/* Hero strip */}
-      <div className="container mx-auto max-w-5xl px-6 pt-2 pb-8">
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">CallBot Builder</h1>
-        <p className="text-muted-foreground mt-2">
+      <div className="max-w-5xl mx-auto px-6 lg:px-12 pt-12 pb-8">
+        <div className="uppercase text-xs tracking-widest text-default mb-4">— Builder</div>
+        <h1 className="display-section">CallBot Builder</h1>
+        <p className="text-muted-foreground mt-4 font-light max-w-md">
           Créez et déployez un assistant vocal en 4 étapes.
         </p>
       </div>
 
       {/* Step indicator */}
-      <div className="container mx-auto max-w-5xl px-6 pb-8">
-        <div className="glass rounded-2xl border border-border p-2 flex items-stretch">
+      <div className="max-w-5xl mx-auto px-6 lg:px-12 pb-8">
+        <div className="border border-border bg-card rounded-md p-2 flex items-stretch gap-1">
           {STEPS.map((label, idx) => {
             const isActive = idx === step;
             const isDone = idx < step;
@@ -123,9 +126,9 @@ export default function BuilderPage() {
               <div
                 key={label}
                 className={
-                  'flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors ' +
+                  'flex-1 flex items-center gap-2 px-3 py-2.5 rounded transition-colors uppercase text-xs tracking-widest ' +
                   (isActive
-                    ? 'bg-primary/15 text-foreground ring-1 ring-primary/30'
+                    ? 'bg-default text-black'
                     : isDone
                       ? 'text-foreground'
                       : 'text-muted-foreground')
@@ -133,15 +136,15 @@ export default function BuilderPage() {
               >
                 <span
                   className={
-                    'size-6 rounded-md flex items-center justify-center text-xs font-mono shrink-0 ' +
+                    'size-6 rounded flex items-center justify-center text-xs font-mono shrink-0 ' +
                     (isActive
-                      ? 'bg-primary text-primary-foreground'
+                      ? 'bg-black text-default'
                       : isDone
-                        ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                        ? 'bg-default/20 text-default'
                         : 'bg-muted text-muted-foreground')
                   }
                 >
-                  {isDone ? <Check className="size-3.5" /> : idx + 1}
+                  {isDone ? <Check className="size-3.5" /> : `0${idx + 1}`}
                 </span>
                 <span className="hidden md:inline truncate">{label}</span>
               </div>
@@ -151,8 +154,8 @@ export default function BuilderPage() {
       </div>
 
       {/* Step content */}
-      <section className="container mx-auto max-w-5xl px-6">
-        <div className="glass rounded-3xl border border-border p-6 md:p-10">
+      <section className="max-w-5xl mx-auto px-6 lg:px-12">
+        <div className="border border-border bg-card rounded-md p-6 md:p-10">
           {step === 0 && (
             <StepTemplate selectedSector={state.sector} onSelect={handleSelectSector} />
           )}
@@ -183,7 +186,7 @@ export default function BuilderPage() {
       </section>
 
       {/* Footer nav */}
-      <footer className="container mx-auto max-w-5xl px-6 py-10 flex items-center justify-between gap-4">
+      <footer className="max-w-5xl mx-auto px-6 lg:px-12 py-10 flex items-center justify-between gap-4">
         <Button
           variant="outline"
           disabled={step === 0 || deploying}

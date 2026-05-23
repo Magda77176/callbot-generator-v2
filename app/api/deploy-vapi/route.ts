@@ -209,6 +209,11 @@ async function deployToVapi(
       temperature: overrides.temperature,
       maxTokens: 200,
       systemPrompt,
+      // Vapi expects inline tools nested inside model.tools (not at the
+      // assistant top level — that returns 400 "property tools should not
+      // exist"). Each tool's own server.url is what routes the invocation
+      // back to our webhook.
+      ...(tools.length > 0 ? { tools } : {}),
     },
     voice: {
       provider: 'cartesia',
@@ -233,10 +238,6 @@ async function deployToVapi(
       url: webhookUrl,
       secret: process.env.VAPI_WEBHOOK_SECRET?.trim(),
     },
-    // Tools at the assistant top level so Vapi routes invocations through its
-    // own webhook system. Nested in model.tools they'd be passed to OpenAI
-    // directly and Vapi wouldn't fan the call out to our server.url.
-    ...(tools.length > 0 ? { tools } : {}),
     backchannelingEnabled: true,
     backgroundDenoisingEnabled: true,
     numWordsToInterruptAssistant: 2,

@@ -16,12 +16,22 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import { CountUp } from '@/components/count-up';
 
-const NUMBERS = [
-  { tone: 'orange', label: 'Faits & chiffres', big: '', subtle: true },
-  { tone: 'dark', label: 'Secteurs supportés', big: '5+' },
-  { tone: 'grey', label: 'Disponibilité', big: '24/7' },
-  { tone: 'light', label: 'Setup', big: '< 5min' },
+interface NumberCard {
+  tone: 'orange' | 'dark' | 'grey' | 'light';
+  label: string;
+  count?: number;
+  suffix?: string;
+  static?: string;
+  subtle?: boolean;
+}
+
+const NUMBERS: NumberCard[] = [
+  { tone: 'orange', label: 'Faits & chiffres', subtle: true },
+  { tone: 'dark', label: 'Secteurs supportés', count: 5, suffix: '+' },
+  { tone: 'grey', label: 'Disponibilité', static: '24/7' },
+  { tone: 'light', label: 'À partir de', count: 99, suffix: '€' },
 ];
 
 const SERVICES = [
@@ -181,10 +191,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* NUMBERS — 4 colored blocks */}
+      {/* NUMBERS — 4 colored blocks with animated counters */}
       <section className="max-w-[1400px] mx-auto px-6 lg:px-12 pt-10 pb-20">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
-          {NUMBERS.map(({ tone, label, big, subtle }) => {
+          {NUMBERS.map((card) => {
+            const { tone, label, count, suffix, static: staticVal, subtle } = card;
             const bg =
               tone === 'orange'
                 ? 'bg-default text-black'
@@ -210,12 +221,14 @@ export default function HomePage() {
                 <div className="mt-auto">
                   {!subtle && (
                     <div className="display-section text-4xl md:text-6xl mb-2 normal-case lowercase">
-                      {big}
+                      {count !== undefined ? (
+                        <CountUp to={count} suffix={suffix ?? ''} />
+                      ) : (
+                        staticVal
+                      )}
                     </div>
                   )}
-                  <div className="text-[11px] uppercase tracking-widest opacity-80">
-                    {label}
-                  </div>
+                  <div className="text-[11px] uppercase tracking-widest opacity-80">{label}</div>
                 </div>
               </div>
             );
@@ -223,26 +236,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* SERVICES — numbered stack */}
-      <section className="max-w-[1400px] mx-auto px-6 lg:px-12 py-20">
-        <h2 className="display-section border-b border-border pb-6 mb-10">Services</h2>
-        <div className="space-y-3">
-          {SERVICES.map(({ n, title, icon: Icon }) => (
-            <div
-              key={n}
-              className="group flex items-center justify-between gap-6 py-5 border-b border-border hover:bg-card/50 px-2 -mx-2 rounded transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-6 md:gap-10">
-                <div className="border border-border bg-[#191919] rounded px-3 py-1.5 text-xs font-mono">
-                  {n}
-                </div>
-                <div className="display-light text-2xl md:text-4xl">{title}</div>
-              </div>
-              <div className="hidden md:flex size-16 rounded-md bg-card border border-border items-center justify-center group-hover:bg-default group-hover:border-default transition-colors">
-                <Icon className="size-6 text-default group-hover:text-black transition-colors" />
-              </div>
+      {/* SERVICES — numbered stack on LIGHT section (Aigocy contrast pattern) */}
+      <section className="section-light">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-24">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            <div className="md:col-span-1">
+              <div className="uppercase text-xs tracking-widest text-default mb-3">— Services</div>
+              <h2 className="display-section text-gradient-subtle">
+                Ce que le bot <br /> sait faire
+              </h2>
             </div>
-          ))}
+            <p className="md:col-span-2 text-base md:text-lg font-light leading-relaxed self-end max-w-xl">
+              Un produit complet, pas un prompt à brancher. De l&apos;ingestion contextuelle au
+              booking calendrier, chaque brique est câblée et testée en production.
+            </p>
+          </div>
+          <div className="space-y-1 border-t border-border">
+            {SERVICES.map(({ n, title, icon: Icon }) => (
+              <div
+                key={n}
+                className="group flex items-center justify-between gap-6 py-6 border-b border-border hover:bg-background/50 px-2 -mx-2 rounded transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-6 md:gap-10">
+                  <div className="border border-border bg-card rounded px-3 py-1.5 text-xs font-mono text-foreground">
+                    {n}
+                  </div>
+                  <div className="display-light text-2xl md:text-4xl">{title}</div>
+                </div>
+                <div className="hidden md:flex size-16 rounded-md bg-background border border-border items-center justify-center group-hover:bg-default group-hover:border-default transition-colors">
+                  <Icon className="size-6 text-default group-hover:text-black transition-colors" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -349,53 +375,80 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* PRICING TEASER */}
-      <section className="max-w-[1400px] mx-auto px-6 lg:px-12 py-20">
-        <h2 className="display-section border-b border-border pb-6 mb-10">Tarifs</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
-          <div>
-            <div className="display-massive text-default">99€</div>
-            <div className="display-light text-xl text-muted-foreground mt-2 uppercase tracking-widest">
-              Par mois
+      {/* PRICING TEASER — 3-card with Pro in inverted light style */}
+      <section className="max-w-[1400px] mx-auto px-6 lg:px-12 py-24">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          <div className="md:col-span-1">
+            <div className="uppercase text-xs tracking-widest text-default mb-3">— Tarifs</div>
+            <h2 className="display-section">
+              À partir de <br />
+              <span className="text-default">99€</span> /mois
+            </h2>
+          </div>
+          <p className="md:col-span-2 text-base md:text-lg font-light leading-relaxed self-end max-w-xl">
+            Pas d&apos;engagement. Résiliable à la fin de chaque mois. Vs ~1 800€/mois pour un
+            standardiste humain à temps partiel.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-5">
+          {/* Starter — dark */}
+          <div className="border border-border bg-card rounded-md p-7 hover:border-default/50 transition-colors">
+            <div className="uppercase text-xs tracking-widest text-muted-foreground mb-2">
+              Starter
             </div>
-            <p className="mt-6 max-w-md font-light leading-relaxed">
-              Pack Starter avec 200 minutes d&apos;appels inclus. Sans engagement, résiliable à la
-              fin de chaque mois. Vs ~1 800 €/mois pour un standardiste humain.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/pricing" className={buttonVariants({ size: 'lg' })}>
-                Simuler mon tarif
-              </Link>
-              <Link href="/builder" className={buttonVariants({ variant: 'outline', size: 'lg' })}>
-                Démarrer
-              </Link>
+            <div className="display-section text-4xl mb-4">99€</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-6">
+              200 min/mois · 0,50 €/min au-delà
+            </div>
+            <div className="text-sm font-light text-muted-foreground">
+              Pour démarrer en douceur. Marco / Alex / Léa / Tom / Sophie. Email + SMS de
+              confirmation inclus.
             </div>
           </div>
-          <div className="border border-border rounded-md p-8 bg-card space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground uppercase tracking-widest text-xs">
-                Starter
-              </span>
-              <span className="font-mono">99€/mois · 200min</span>
+
+          {/* Pro — INVERTED light card */}
+          <div className="bg-white text-black rounded-md p-7 relative ring-2 ring-default">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-default text-black px-3 py-1 rounded uppercase tracking-widest font-semibold whitespace-nowrap">
+              Recommandé
+            </span>
+            <div className="uppercase text-xs tracking-widest text-neutral-500 mb-2">Pro</div>
+            <div className="display-section text-4xl mb-4">199€</div>
+            <div className="text-xs text-neutral-500 uppercase tracking-widest mb-6">
+              500 min/mois · 0,40 €/min au-delà
             </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground uppercase tracking-widest text-xs">Pro</span>
-              <span className="font-mono">199€/mois · 500min</span>
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground uppercase tracking-widest text-xs">
-                Business
-              </span>
-              <span className="font-mono">399€/mois · 1200min</span>
-            </div>
-            <div className="h-px bg-border" />
-            <div className="text-xs text-muted-foreground pt-2 leading-relaxed">
-              + frais d&apos;installation unique de 149 € (configuration sur-mesure, enrichissement,
-              tests).
+            <div className="text-sm font-light text-neutral-700">
+              Pour la majorité des établissements. Tarif au-delà réduit, support prioritaire,
+              enrichissement contextuel automatique.
             </div>
           </div>
+
+          {/* Business — dark */}
+          <div className="border border-border bg-card rounded-md p-7 hover:border-default/50 transition-colors">
+            <div className="uppercase text-xs tracking-widest text-muted-foreground mb-2">
+              Business
+            </div>
+            <div className="display-section text-4xl mb-4">399€</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-6">
+              1200 min/mois · 0,30 €/min au-delà
+            </div>
+            <div className="text-sm font-light text-muted-foreground">
+              Pour les gros volumes. Multi-bots inclus, support dédié, onboarding personnalisé.
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 flex flex-wrap items-center gap-3">
+          <Link href="/pricing" className={buttonVariants({ size: 'lg' }) + ' btn-elevated'}>
+            Simuler mon tarif
+            <ArrowUpRight className="size-4" />
+          </Link>
+          <Link href="/builder" className={buttonVariants({ variant: 'outline', size: 'lg' })}>
+            Démarrer
+          </Link>
+          <span className="text-xs text-muted-foreground ml-auto">
+            + frais d&apos;installation unique de 149 €
+          </span>
         </div>
       </section>
 

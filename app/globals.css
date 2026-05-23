@@ -163,3 +163,47 @@
     radial-gradient(ellipse 60% 50% at 50% 0%, oklch(0.65 0.19 50 / 0.15), transparent 60%),
     radial-gradient(ellipse 80% 80% at 50% 50%, oklch(0.05 0 0), oklch(0 0 0));
 }
+
+/* Aigocy-inspired: high-contrast off-white section that breaks the dark
+   rhythm. Inverts foreground/card while keeping the orange accent. */
+.section-light {
+  background: oklch(0.97 0.005 60);
+  color: oklch(0.12 0 0);
+}
+.section-light .text-muted-foreground { color: oklch(0.45 0 0); }
+.section-light .bg-card { background-color: oklch(1 0 0); }
+.section-light .border-border { border-color: oklch(0.88 0 0); }
+.section-light .bg-background { background-color: oklch(0.96 0 0); }
+
+/* Aigocy-inspired button elevation. Adds depth and tactile feel. */
+.btn-elevated {
+  box-shadow:
+    0 1px 0 0 oklch(1 0 0 / 0.2) inset,
+    0 -2px 0 0 oklch(0 0 0 / 0.15) inset,
+    0 2px 4px -1px oklch(0 0 0 / 0.3),
+    0 6px 16px -4px oklch(0 0 0 / 0.4);
+  transition: all 0.2s ease;
+}
+.btn-elevated:hover {
+  box-shadow:
+    0 1px 0 0 oklch(1 0 0 / 0.3) inset,
+    0 -3px 0 0 oklch(0 0 0 / 0.2) inset,
+    0 4px 8px -1px oklch(0 0 0 / 0.4),
+    0 12px 24px -6px oklch(0.65 0.19 50 / 0.4);
+  transform: translateY(-1px);
+}
+
+/* Subtle text gradient à la Aigocy — gray on gray, not vivid */
+.text-gradient-subtle {
+  background: linear-gradient(120deg, oklch(0.98 0 0) 20%, oklch(0.55 0 0) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.section-light .text-gradient-subtle {
+  background: linear-gradient(120deg, oklch(0.15 0 0) 20%, oklch(0.5 0 0) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

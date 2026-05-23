@@ -11,7 +11,6 @@ import type { ModelOption } from '@/lib/builder-types';
 import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
 import { checkLimit, clientIp, deployLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 
-const DEFAULT_WEBHOOK_URL = 'https://webhook.homepop.fr/webhook/vapi';
 const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
 const DEFAULT_MODEL: ModelOption = 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.3;
@@ -219,7 +218,13 @@ async function deployToVapi(
 
   // .trim() guards against accidental trailing whitespace/newline when the env var
   // is pasted into the Vercel dashboard. Vapi rejects URLs with any control chars.
-  const webhookUrl = (process.env.VAPI_WEBHOOK_URL || DEFAULT_WEBHOOK_URL).trim();
+  const webhookUrl = process.env.VAPI_WEBHOOK_URL?.trim();
+  if (!webhookUrl) {
+    throw new Error(
+      'VAPI_WEBHOOK_URL not configured — set it to your deployed /api/vapi-webhook URL',
+    );
+  }
+  console.log('[deploy-vapi] using webhookUrl=', webhookUrl);
   const apiKey = process.env.VAPI_API_KEY?.trim() ?? '';
   const toolSpecs = buildToolsForSector(config.sector, webhookUrl);
 

@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { ArrowRight, Check, Phone, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 
 interface Plan {
   id: string;
@@ -12,12 +11,38 @@ interface Plan {
   monthly: number;
   minutes: number;
   overagePerMinute: number;
+  tagline: string;
+  features: string[];
 }
 
 const PLANS: Plan[] = [
-  { id: 'starter', name: 'Starter', monthly: 99, minutes: 200, overagePerMinute: 0.5 },
-  { id: 'pro', name: 'Pro', monthly: 199, minutes: 500, overagePerMinute: 0.4 },
-  { id: 'business', name: 'Business', monthly: 399, minutes: 1200, overagePerMinute: 0.3 },
+  {
+    id: 'starter',
+    name: 'Starter',
+    monthly: 99,
+    minutes: 200,
+    overagePerMinute: 0.5,
+    tagline: 'Pour démarrer en douceur',
+    features: ['200 min/mois inclus', 'Email + SMS de confirmation', 'Intégration Google Calendar', 'Voix française naturelle'],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    monthly: 199,
+    minutes: 500,
+    overagePerMinute: 0.4,
+    tagline: 'Pour la majorité des établissements',
+    features: ['500 min/mois inclus', 'Tarif au-delà réduit', 'Enrichissement contextuel automatique', 'Support prioritaire'],
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    monthly: 399,
+    minutes: 1200,
+    overagePerMinute: 0.3,
+    tagline: 'Pour les gros volumes',
+    features: ['1200 min/mois inclus', 'Tarif au-delà optimal', 'Multi-bots inclus', 'Support dédié + onboarding'],
+  },
 ];
 
 const SETUP_FEE_EUR = 149;
@@ -61,27 +86,54 @@ export default function PricingPage() {
   }, [callsPerMonth, avgMinutes]);
 
   return (
-    <main className="container mx-auto max-w-5xl px-4 py-12 space-y-10">
-      <header className="text-center space-y-3">
-        <h1 className="text-4xl font-bold tracking-tight">
-          Combien votre CallBot va vous coûter ?
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Estimez votre tarif mensuel selon votre volume d&apos;appels entrants.
-        </p>
+    <main className="min-h-screen">
+      {/* Header */}
+      <header className="container mx-auto max-w-6xl px-6 py-6 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="size-8 rounded-lg bg-primary/15 ring-1 ring-primary/30 flex items-center justify-center group-hover:ring-glow transition-shadow">
+            <Phone className="size-4 text-primary" />
+          </div>
+          <span className="font-semibold tracking-tight">CallBot</span>
+        </Link>
+        <nav className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="text-sm text-muted-foreground hover:text-foreground px-3 py-2 transition-colors"
+          >
+            Accueil
+          </Link>
+          <Link href="/builder" className={buttonVariants({ size: 'sm' })}>
+            Démarrer
+          </Link>
+        </nav>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Votre activité</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-8">
+      {/* Hero */}
+      <section className="container mx-auto max-w-4xl px-6 pt-12 pb-16 text-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1 text-xs text-muted-foreground mb-6">
+          <Sparkles className="size-3 text-primary" />
+          Estimation transparente · Sans engagement
+        </div>
+        <h1 className="text-4xl md:text-6xl font-semibold tracking-tight leading-[1.05] text-balance">
+          Combien votre CallBot
+          <br />
+          <span className="text-gradient">va vous coûter ?</span>
+        </h1>
+        <p className="mt-5 text-lg text-muted-foreground max-w-2xl mx-auto">
+          Bougez les sliders pour estimer votre tarif mensuel. Le plan recommandé s&apos;adapte en
+          temps réel.
+        </p>
+      </section>
+
+      {/* Simulator */}
+      <section className="container mx-auto max-w-3xl px-6 pb-10">
+        <div className="glass rounded-3xl border border-border p-8 space-y-8">
           <div className="space-y-3">
             <div className="flex items-baseline justify-between">
-              <Label htmlFor="calls" className="text-base">
+              <label htmlFor="calls" className="text-base font-medium">
                 Appels reçus par mois
-              </Label>
-              <span className="font-mono text-2xl font-bold tabular-nums">{callsPerMonth}</span>
+              </label>
+              <span className="font-mono text-3xl font-bold tabular-nums">{callsPerMonth}</span>
             </div>
             <input
               id="calls"
@@ -101,10 +153,10 @@ export default function PricingPage() {
 
           <div className="space-y-3">
             <div className="flex items-baseline justify-between">
-              <Label htmlFor="duration" className="text-base">
+              <label htmlFor="duration" className="text-base font-medium">
                 Durée moyenne par appel
-              </Label>
-              <span className="font-mono text-2xl font-bold tabular-nums">{avgMinutes} min</span>
+              </label>
+              <span className="font-mono text-3xl font-bold tabular-nums">{avgMinutes} min</span>
             </div>
             <input
               id="duration"
@@ -122,112 +174,146 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <div className="pt-2 border-t flex items-baseline justify-between">
+          <div className="pt-2 border-t border-border flex items-baseline justify-between">
             <span className="text-sm text-muted-foreground">Volume mensuel total</span>
-            <span className="text-3xl font-bold">
-              {totalMinutes.toLocaleString('fr-FR')} <span className="text-base font-normal text-muted-foreground">minutes</span>
+            <span className="text-3xl font-semibold tabular-nums">
+              {totalMinutes.toLocaleString('fr-FR')}
+              <span className="text-base font-normal text-muted-foreground"> min</span>
             </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {planCosts.map(({ plan, base, overage, overageMinutes, total }) => {
-          const isRecommended = plan.id === recommendedId;
-          return (
-            <Card
-              key={plan.id}
-              className={
-                isRecommended ? 'border-primary border-2 shadow-md relative' : 'relative'
-              }
-            >
-              {isRecommended && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-primary text-primary-foreground px-3 py-1 rounded-full font-semibold">
-                  Recommandé pour vous
-                </span>
-              )}
-              <CardHeader className="space-y-2">
-                <CardTitle className="text-xl">{plan.name}</CardTitle>
-                <div>
-                  <span className="text-4xl font-bold">{eur(plan.monthly)}</span>
+      {/* Plans */}
+      <section className="container mx-auto max-w-6xl px-6 py-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {planCosts.map(({ plan, base, overage, overageMinutes, total }) => {
+            const isRecommended = plan.id === recommendedId;
+            return (
+              <div
+                key={plan.id}
+                className={
+                  isRecommended
+                    ? 'relative rounded-3xl border border-primary/50 bg-card/70 backdrop-blur p-7 ring-glow'
+                    : 'relative rounded-3xl border border-border bg-card/40 p-7 hover:border-primary/30 transition-colors'
+                }
+              >
+                {isRecommended && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-primary text-primary-foreground px-3 py-1 rounded-full font-semibold whitespace-nowrap">
+                    Recommandé pour vous
+                  </span>
+                )}
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">{plan.tagline}</div>
+                  <h3 className="text-2xl font-semibold tracking-tight">{plan.name}</h3>
+                </div>
+
+                <div className="mt-6">
+                  <span className="text-5xl font-semibold tracking-tight">{eur(plan.monthly)}</span>
                   <span className="text-sm text-muted-foreground"> /mois</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {plan.minutes} min incluses · {plan.overagePerMinute.toFixed(2)} €/min au-delà
+                <p className="text-xs text-muted-foreground mt-1">
+                  Puis {plan.overagePerMinute.toFixed(2)} €/min au-delà
                 </p>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Forfait</span>
-                  <span className="tabular-nums">{eur(base)}</span>
-                </div>
-                {overageMinutes > 0 ? (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Dépassement ({overageMinutes} min)
-                    </span>
-                    <span className="tabular-nums">{eur(overage)}</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Aucun dépassement</span>
-                    <span className="tabular-nums">{eur(0)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold pt-2 border-t">
-                  <span>Total mensuel</span>
-                  <span className="tabular-nums text-lg">{eur(total)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
 
-      <Card className="bg-muted/30">
-        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <ul className="mt-6 space-y-2.5">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm">
+                      <Check className="size-4 text-primary mt-0.5 shrink-0" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-7 pt-5 border-t border-border space-y-1.5">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Forfait</span>
+                    <span className="tabular-nums">{eur(base)}</span>
+                  </div>
+                  {overageMinutes > 0 ? (
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Dépassement ({overageMinutes} min)</span>
+                      <span className="tabular-nums">{eur(overage)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-xs text-emerald-400">
+                      <span>Aucun dépassement</span>
+                      <span className="tabular-nums">{eur(0)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold pt-2">
+                    <span>Total mensuel</span>
+                    <span className="tabular-nums text-xl">{eur(total)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Impact summary */}
+      <section className="container mx-auto max-w-5xl px-6 py-10">
+        <div className="glass rounded-3xl border border-border p-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
               Coût moyen par appel
             </p>
-            <p className="text-3xl font-bold tabular-nums">{eur(costPerCall)}</p>
+            <p className="text-4xl font-semibold tabular-nums">{eur(costPerCall)}</p>
             <p className="text-xs text-muted-foreground mt-1">avec le plan {cheapest.plan.name}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-              Standard humain équivalent
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+              Standardiste humain équivalent
             </p>
-            <p className="text-3xl font-bold tabular-nums line-through text-muted-foreground">
+            <p className="text-4xl font-semibold tabular-nums line-through text-muted-foreground/60">
               {eur(HUMAN_RECEPTIONIST_PER_MONTH_EUR)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">par mois, temps partiel</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
               Vous économisez
             </p>
-            <p className="text-3xl font-bold tabular-nums text-green-600">{eur(savings)}</p>
+            <p className="text-4xl font-semibold tabular-nums text-emerald-400">{eur(savings)}</p>
             <p className="text-xs text-muted-foreground mt-1">par mois</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <div className="text-center space-y-4 pt-2">
-        <p className="text-sm text-muted-foreground">
-          + frais d&apos;installation unique de <strong>{eur(SETUP_FEE_EUR)}</strong> (configuration
-          sur-mesure, enrichissement de votre fiche établissement, tests)
+      {/* CTA */}
+      <section className="container mx-auto max-w-4xl px-6 py-16 text-center">
+        <p className="text-sm text-muted-foreground mb-5">
+          + frais d&apos;installation unique de <strong className="text-foreground">{eur(SETUP_FEE_EUR)}</strong>{' '}
+          (configuration sur-mesure, enrichissement de votre fiche, tests)
         </p>
         <Link href="/builder" className={buttonVariants({ size: 'lg' })}>
           Démarrer maintenant
+          <ArrowRight className="size-4" />
         </Link>
-        <p className="text-xs text-muted-foreground">
-          Pas d&apos;engagement. Vous pouvez résilier à la fin de chaque mois.
+        <p className="mt-4 text-xs text-muted-foreground">
+          Sans engagement · Résiliable à la fin de chaque mois
         </p>
-      </div>
+      </section>
 
-      <footer className="text-center text-xs text-muted-foreground pt-8 border-t">
-        Disponible 24/7. Voix française naturelle. Intégration agenda Google + email + SMS de
-        confirmation inclus.
+      {/* Footer */}
+      <footer className="container mx-auto max-w-6xl px-6 py-10 border-t border-border mt-8">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="size-6 rounded-md bg-primary/15 ring-1 ring-primary/30 flex items-center justify-center">
+              <Phone className="size-3 text-primary" />
+            </div>
+            <span>CallBot · Standards téléphoniques IA</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:text-foreground transition-colors">
+              Accueil
+            </Link>
+            <Link href="/builder" className="hover:text-foreground transition-colors">
+              Démarrer
+            </Link>
+          </div>
+        </div>
       </footer>
     </main>
   );

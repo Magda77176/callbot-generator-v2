@@ -1,0 +1,141 @@
+import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
+import {
+  durationSeconds,
+  fmtCost,
+  fmtDate,
+  fmtDuration,
+  getAssistant,
+  getCall,
+} from '@/lib/vapi-server';
+
+export const dynamic = 'force-dynamic';
+
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function CallDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  let call;
+  try {
+    call = await getCall(id);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Erreur inconnue';
+    return (
+      <div className="border border-red-500/40 bg-red-500/10 rounded-md p-6">
+        <div className="uppercase text-xs tracking-widest text-red-400 mb-2">Erreur API Vapi</div>
+        <pre className="text-sm font-mono text-red-300 whitespace-pre-wrap">{message}</pre>
+      </div>
+    );
+  }
+
+  const assistant = call.assistantId
+    ? await getAssistant(call.assistantId).catch(() => null)
+    : null;
+
+  return (
+    <div className="space-y-10">
+      <Link
+        href="/admin/calls"
+        className="text-xs uppercase tracking-widest text-muted-foreground hover:text-default inline-flex items-center gap-1"
+      >
+        <ChevronLeft className="size-3" />
+        Retour aux appels
+      </Link>
+
+      <div>
+        <div className="uppercase text-xs tracking-widest text-default mb-3">— Appel</div>
+        <h1 className="display-section">
+          {assistant?.name || 'Appel'} ·{' '}
+          <span className="text-muted-foreground">{fmtDate(call.startedAt)}</span>
+        </h1>
+      </div>
+
+      {/* Metadata grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Stat label="Durée" value={fmtDuration(durationSeconds(call))} />
+        <Stat label="Statut" value={call.status ?? '—'} />
+        <Stat label="Caller" value={call.customer?.number ?? '—'} mono />
+        <Stat label="Coût total" value={fmtCost(call.cost)} />
+      </div>
+
+      {/* Cost breakdown */}
+      {call.costBreakdown && (
+        <div className="border border-border bg-card rounded-md p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-4">
+            Breakdown du coût
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <Stat label="LLM" value={fmtCost(call.costBreakdown.llm)} />
+            <Stat label="STT" value={fmtCost(call.costBreakdown.stt)} />
+            <Stat label="TTS" value={fmtCost(call.costBreakdown.tts)} />
+            <Stat label="Transport" value={fmtCost(call.costBreakdown.transport)} />
+            <Stat label="Vapi" value={fmtCost(call.costBreakdown.vapi)} />
+          </div>
+        </div>
+      )}
+
+      {/* Recording */}
+      {call.recordingUrl && (
+        <div className="border border-border bg-card rounded-md p-6 space-y-3">
+          <div className="uppercase text-xs tracking-widest text-default">Enregistrement</div>
+          <audio src={call.recordingUrl} controls className="w-full" />
+          <a
+            href={call.recordingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs uppercase tracking-widest text-default hover:underline"
+          >
+            Ouvrir dans un nouvel onglet →
+          </a>
+        </div>
+      )}
+
+      {/* Summary */}
+      {call.summary && (
+        <div className="border border-border bg-card rounded-md p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-3">Résumé Vapi</div>
+          <p className="text-sm font-light leading-relaxed">{call.summary}</p>
+        </div>
+      )}
+
+      {/* Transcript */}
+      {call.transcript && (
+        <div className="border border-border bg-card rounded-md p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-3">Transcript</div>
+          <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed text-muted-foreground max-h-[60vh] overflow-y-auto">
+            {call.transcript}
+          </pre>
+        </div>
+      )}
+
+      {/* End reason if not OK */}
+      {call.endedReason && (
+        <div className="border border-border bg-card rounded-md p-6">
+          <div className="uppercase text-xs tracking-widest text-default mb-2">Fin d&apos;appel</div>
+          <div className="font-mono text-sm">{call.endedReason}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="border border-border bg-card rounded-md p-4">
+      <div className="uppercase text-[10px] tracking-widest text-muted-foreground mb-1">
+        {label}
+      </div>
+      <div className={mono ? 'font-mono text-sm' : 'display-light text-xl'}>{value}</div>
+    </div>
+  );
+}

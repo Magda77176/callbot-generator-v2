@@ -11,10 +11,15 @@ import type { ModelOption } from '@/lib/builder-types';
 import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
 import { checkLimit, clientIp, deployLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 import {
+  buildToolSpecByName,
+  buildToolsCalendarUrl,
   buildToolsForSector,
   buildTranscriberConfig,
+  createHandoffTool,
+  createSquad,
   createVapiTool,
 } from '@/lib/vapi-tools';
+import { getSquad, type SquadRole } from '@/lib/callbot-squads';
 
 const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
 const DEFAULT_MODEL: ModelOption = 'gpt-4o-mini';
@@ -61,12 +66,191 @@ interface DeployRequestBody {
 interface VapiAssistantResponse {
   id: string;
   phoneNumber?: string;
+  /** Set when the persona was deployed as a Vapi squad (multi-assistant). */
+  squadId?: string;
+  /** Set when the persona was deployed as a squad — first member's name. */
+  mode?: 'single' | 'squad';
 }
 
 interface DeployOverrides {
   systemPrompt?: string;
   model: ModelOption;
   temperature: number;
+}
+
+/**
+ * Squad-mode deploy. Creates N specialised assistants (qualifier, proposer,
+ * booker, closer for Alex) plus the handoff tools between them, then wraps
+ * them in a Vapi squad via POST /squad. Returns the squadId and the first
+ * member's assistantId for backward compat.
+ *
+ * Order matters: we create deepest-first (closer → booker → proposer →
+ * qualifier) so each upstream member has its downstream targets' ids when
+ * we build its handoff tools.
+ */
+async function deploySquadToVapi(
+  squad: import('@/lib/callbot-squads').SquadConfig,
+  businessInfo: BusinessInfo,
+  voiceId: string,
+  enrichedContext: string | undefined,
+  overrides: DeployOverrides,
+  apiKey: string,
+): Promise<VapiAssistantResponse> {
+  const webhookUrl = process.env.VAPI_WEBHOOK_URL?.trim();
+  if (!webhookUrl) throw new Error('VAPI_WEBHOOK_URL not configured');
+  const toolsCalendarUrl = buildToolsCalendarUrl();
+  const businessName = businessInfo.name || 'notre établissement';
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Deploy order: deepest first so handoff sources have target ids
+  const orderedRoles: SquadRole[] = ['closer', 'booker', 'proposer', 'qualifier'];
+  const memberByRole = new Map(squad.members.map((m) => [m.role, m]));
+  const assistantIdByRole: Partial<Record<SquadRole, string>> = {};
+
+  for (const role of orderedRoles) {
+    const m = memberByRole.get(role);
+    if (!m) continue;
+
+    // 1. Business tools (record_lead, calendar, etc.)
+    const businessSpecs = m.toolNames
+      .map((n) => buildToolSpecByName(n, webhookUrl, toolsCalendarUrl))
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+    const businessToolIds = await Promise.all(
+      businessSpecs.map((s) => createVapiTool(s, apiKey)),
+    );
+
+    // 2. Handoff tools (one per downstream destination)
+    const handoffToolIds: string[] = [];
+    for (const h of m.handoffs) {
+      const targetId = assistantIdByRole[h.toRole];
+      if (!targetId) {
+        throw new Error(
+          `Squad deploy order bug: ${role} needs handoff to ${h.toRole} but target not yet created`,
+        );
+      }
+      const id = await createHandoffTool(
+        `handoff_to_${h.toRole}`,
+        h.when,
+        targetId,
+        apiKey,
+      );
+      handoffToolIds.push(id);
+    }
+
+    const toolIds = [...businessToolIds, ...handoffToolIds];
+
+    // 3. Build the system prompt. Proposer is the only member that gets the
+    //    portfolio context (CONTEXTE BUSINESS RÉEL) — other members can read
+    //    the result through the preserved transcript.
+    let systemPrompt = m.systemPrompt.replace(/\{\{business_name\}\}/g, businessName);
+    if (role === 'proposer' && enrichedContext?.trim()) {
+      systemPrompt +=
+        '\n\n══════════════\nCONTEXTE BUSINESS RÉEL\n══════════════\n\n' + enrichedContext.trim();
+    }
+
+    // 4. Build the assistant payload. Shared voice / transcriber / speech
+    //    pipeline across all members so the call sounds coherent.
+    const payload: Record<string, unknown> = {
+      name: `${m.name} - ${businessName}`,
+      ...(m.greeting
+        ? { firstMessage: m.greeting.replace(/\{\{business_name\}\}/g, businessName) }
+        : {}),
+      metadata: {
+        plan: 'starter',
+        planStartDate: today,
+        businessName: businessInfo.name?.trim() || '',
+        sector: squad.sector,
+        squadRole: role,
+        contactEmail: process.env.NOTIFICATION_EMAIL?.trim() || '',
+      },
+      model: {
+        ...vapiModelConfig(overrides.model),
+        temperature: overrides.temperature,
+        maxTokens: 200,
+        systemPrompt,
+        ...(toolIds.length > 0 ? { toolIds } : {}),
+      },
+      voice: {
+        provider: 'cartesia',
+        voiceId,
+        model: 'sonic-3',
+        language: 'fr',
+        experimentalControls: { speed: -0.2 },
+        chunkPlan: {
+          enabled: true,
+          minCharacters: 60,
+          punctuationBoundaries: ['.', '!', '?'],
+        },
+      },
+      transcriber: buildTranscriberConfig(squad.sector, businessInfo),
+      server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET?.trim() },
+      backchannelingEnabled: true,
+      backgroundDenoisingEnabled: true,
+      startSpeakingPlan: {
+        transcriptionEndpointingPlan: {
+          onPunctuationSeconds: 0.1,
+          onNoPunctuationSeconds: 1.5,
+          onNumberSeconds: 0.5,
+        },
+        waitSeconds: 0.4,
+      },
+      stopSpeakingPlan: {
+        numWords: 1,
+        voiceSeconds: 0.3,
+        backoffSeconds: 0.5,
+      },
+      endCallPhrases: END_CALL_PHRASES,
+      silenceTimeoutSeconds: 20,
+      responseDelaySeconds: 0.4,
+    };
+
+    const res = await fetch('https://api.vapi.ai/assistant', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Vapi assistant create failed for squad member ${role}: ${res.status} - ${await res.text()}`,
+      );
+    }
+    const data = (await res.json()) as { id: string };
+    assistantIdByRole[role] = data.id;
+  }
+
+  // 5. Create the squad referencing all members in original order (first =
+  //    starting assistant = the qualifier)
+  const orderedMemberIds = squad.members
+    .map((m) => assistantIdByRole[m.role])
+    .filter((id): id is string => Boolean(id));
+  const squadId = await createSquad(`${squad.nameTemplate} - ${businessName}`, orderedMemberIds, apiKey);
+
+  // 6. Best-effort backfill of squadId into each member's metadata so admin
+  //    pages can group them. Non-fatal if any patch fails.
+  await Promise.allSettled(
+    Object.entries(assistantIdByRole).map(async ([, id]) => {
+      const get = await fetch(`https://api.vapi.ai/assistant/${id}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: 'no-store',
+      });
+      if (!get.ok) return;
+      const existing = (await get.json()) as { metadata?: Record<string, unknown> };
+      const meta = { ...(existing.metadata ?? {}), squadId };
+      await fetch(`https://api.vapi.ai/assistant/${id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metadata: meta }),
+      });
+    }),
+  );
+
+  // The qualifier (squad.members[0]) is the starting assistant — return its id
+  // so the wizard's success screen / test page can use it for the first call.
+  return {
+    id: assistantIdByRole.qualifier ?? orderedMemberIds[0],
+    squadId,
+    mode: 'squad',
+  };
 }
 
 async function deployToVapi(
@@ -76,6 +260,14 @@ async function deployToVapi(
   enrichedContext: string | undefined,
   overrides: DeployOverrides,
 ): Promise<VapiAssistantResponse> {
+  // If a Squad definition exists for this sector, deploy in squad mode.
+  // Currently only `immobilier` has a squad — others remain single-assistant.
+  const squad = getSquad(config.sector);
+  if (squad) {
+    const apiKey = process.env.VAPI_API_KEY?.trim() ?? '';
+    return deploySquadToVapi(squad, businessInfo, voiceId, enrichedContext, overrides, apiKey);
+  }
+
   const businessName = businessInfo.name || 'notre établissement';
   // Always go through buildPersonalizedPrompt so the CONTEXTE BUSINESS RÉEL +
   // INFORMATIONS ÉTABLISSEMENT blocks wrap the prompt. Pass overrides.systemPrompt
@@ -271,6 +463,8 @@ export async function POST(request: Request) {
       {
         success: true,
         assistantId: result.id,
+        squadId: result.squadId,
+        mode: result.mode ?? 'single',
         phoneNumber: result.phoneNumber || "En cours d'attribution...",
         sector,
         assistantName: config.name,

@@ -308,3 +308,112 @@ export async function createVapiTool(toolSpec: VapiToolSpec, apiKey: string): Pr
   const data = (await res.json()) as { id: string };
   return data.id;
 }
+
+// ─────────────────────────────────────────────────────────────
+// SQUAD HELPERS — handoff tools + multi-assistant deploy
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Builds a Vapi handoff tool spec. The bot calls this tool to transfer
+ * the conversation to another assistant in the same squad. Vapi preserves
+ * the conversation transcript across the handoff.
+ *
+ * @param functionName — slug like "handoff_to_proposer"
+ * @param description — natural-language condition the LLM evaluates
+ * @param destinationAssistantId — target Vapi assistant id
+ */
+export function handoffToolSpec(
+  functionName: string,
+  description: string,
+  destinationAssistantId: string,
+): unknown {
+  return {
+    type: 'handoff',
+    function: { name: functionName },
+    destinations: [
+      {
+        type: 'assistant',
+        assistantId: destinationAssistantId,
+        description,
+      },
+    ],
+  };
+}
+
+/**
+ * Create a handoff tool via POST /tool. Returns its id, suitable for
+ * including in another assistant's model.toolIds.
+ */
+export async function createHandoffTool(
+  functionName: string,
+  description: string,
+  destinationAssistantId: string,
+  apiKey: string,
+): Promise<string> {
+  const spec = handoffToolSpec(functionName, description, destinationAssistantId);
+  const res = await fetch('https://api.vapi.ai/tool', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(spec),
+  });
+  if (!res.ok) {
+    throw new Error(`Vapi handoff tool create failed: ${res.status} - ${await res.text()}`);
+  }
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+/**
+ * Create a Vapi squad referencing already-created member assistants.
+ *
+ * @returns the squad id
+ */
+export async function createSquad(
+  name: string,
+  memberAssistantIds: string[],
+  apiKey: string,
+): Promise<string> {
+  const body = {
+    name,
+    members: memberAssistantIds.map((id) => ({ assistantId: id })),
+  };
+  const res = await fetch('https://api.vapi.ai/squad', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Vapi squad create failed: ${res.status} - ${await res.text()}`);
+  }
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+/**
+ * Look up a tool spec by name. Used by the squad deploy flow to build
+ * model.toolIds for each member.
+ */
+export function buildToolSpecByName(
+  name: string,
+  webhookUrl: string,
+  toolsCalendarUrl: string,
+): VapiToolSpec | null {
+  switch (name) {
+    case 'record_lead':
+      return leadToolSpec(webhookUrl);
+    case 'record_reservation':
+      return reservationToolSpec(webhookUrl);
+    case 'check_calendar_availability':
+      return checkCalendarToolSpec(toolsCalendarUrl);
+    case 'book_calendar_event':
+      return bookCalendarToolSpec(toolsCalendarUrl);
+    default:
+      return null;
+  }
+}

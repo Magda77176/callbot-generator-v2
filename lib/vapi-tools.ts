@@ -16,16 +16,33 @@ const MARTINIQUE_TOWNS = [
   'Rivière-Salée',
 ];
 
+// Vapi rejects keywords containing spaces — they must each be a single token.
+// So we split multi-word phrases ("Le Diamant", "Ravine Vilaine", agency
+// names like "Amelie immo") into individual words and filter out French
+// stopwords + ultra-short words that would over-boost generic conversation.
+const FR_STOPWORDS = new Set([
+  'le', 'la', 'les', 'de', 'du', 'des', 'l', 'd',
+  'un', 'une', 'au', 'aux', 'et', 'ou',
+]);
+
+function emitTokens(phrase: string, boost: number, out: string[]): void {
+  for (const word of phrase.trim().split(/\s+/)) {
+    if (word.length < 3) continue;
+    if (FR_STOPWORDS.has(word.toLowerCase())) continue;
+    out.push(`${word}:${boost}`);
+  }
+}
+
 export function buildTranscriberKeywords(
   sector: Sector,
   businessInfo: BusinessInfo,
 ): string[] {
   const keywords: string[] = [];
   if (businessInfo.name?.trim()) {
-    keywords.push(`${businessInfo.name.trim()}:3`);
+    emitTokens(businessInfo.name.trim(), 3, keywords);
   }
   if (sector === 'immobilier') {
-    for (const town of MARTINIQUE_TOWNS) keywords.push(`${town}:2`);
+    for (const town of MARTINIQUE_TOWNS) emitTokens(town, 2, keywords);
   }
   return keywords;
 }

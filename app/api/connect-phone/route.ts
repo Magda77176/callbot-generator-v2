@@ -1,32 +1,31 @@
 import { NextResponse } from 'next/server';
 import {
-  listAvailableNumbers,
-  listFrenchDirections,
+  assignConnection,
+  findPhoneNumber,
+  listAvailableFrenchNumbers,
   orderNumber,
-  setExternalSipUri,
-} from '@/lib/zadarma';
+  setVoiceTranslatedNumber,
+} from '@/lib/telnyx';
 
 interface ConnectPhoneBody {
   assistantId?: string;
-  /**
-   * Optional override of the Zadarma direction (region) id. If omitted we
-   * pick the first FR direction returned by Zadarma.
-   */
-  directionId?: number;
 }
 
-interface VapiPhoneNumber {
+interface VapiSipPhoneNumber {
   id: string;
-  number: string;
-  provider: string;
+  sipUri: string;
 }
 
-async function createVapiPhoneNumber(
-  number: string,
-  credentialId: string,
+/**
+ * Create a Vapi phone-number with provider="vapi" and a custom SIP URI. This
+ * URI is what we'll tell Telnyx to translate the inbound INVITE to, so
+ * Telnyx delivers the call to Vapi which then routes to the right assistant.
+ */
+async function createVapiSipNumber(
+  sipUri: string,
   assistantId: string,
   apiKey: string,
-): Promise<VapiPhoneNumber> {
+): Promise<VapiSipPhoneNumber> {
   const res = await fetch('https://api.vapi.ai/phone-number', {
     method: 'POST',
     headers: {
@@ -34,35 +33,37 @@ async function createVapiPhoneNumber(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      provider: 'byo-phone-number',
-      name: `Bot ${assistantId.slice(0, 8)}`,
-      number,
-      numberE164CheckEnabled: false,
-      credentialId,
+      provider: 'vapi',
+      sipUri,
       assistantId,
+      name: `Bot ${assistantId.slice(0, 8)}`,
     }),
   });
   if (!res.ok) {
     throw new Error(`Vapi phone-number create failed: ${res.status} - ${await res.text()}`);
   }
-  return (await res.json()) as VapiPhoneNumber;
+  return (await res.json()) as VapiSipPhoneNumber;
+}
+
+function sanitiseAssistantId(assistantId: string): string {
+  // SIP URI user part needs to be alphanumeric-ish. Strip non-safe chars and
+  // lowercase. Assistant IDs are UUIDs so this is mostly a defensive trim.
+  return assistantId.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 24);
 }
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  // Required env checks before touching external APIs.
-  const apiKey = process.env.VAPI_API_KEY?.trim();
-  const credentialId = process.env.VAPI_ZADARMA_CREDENTIAL_ID?.trim();
-  const zadarmaKey = process.env.ZADARMA_USER_KEY?.trim();
-  const zadarmaSecret = process.env.ZADARMA_SECRET?.trim();
+  const vapiKey = process.env.VAPI_API_KEY?.trim();
+  const telnyxKey = process.env.TELNYX_API_KEY?.trim();
+  const connectionId = process.env.TELNYX_CONNECTION_ID?.trim();
 
-  if (!apiKey || !credentialId || !zadarmaKey || !zadarmaSecret) {
+  if (!vapiKey || !telnyxKey || !connectionId) {
     return NextResponse.json(
       {
         success: false,
         error:
-          'Configuration incomplète. Env vars requis: VAPI_API_KEY, VAPI_ZADARMA_CREDENTIAL_ID, ZADARMA_USER_KEY, ZADARMA_SECRET',
+          'Configuration incomplète. Env vars requis: VAPI_API_KEY, TELNYX_API_KEY, TELNYX_CONNECTION_ID',
       },
       { status: 503 },
     );
@@ -83,51 +84,50 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Resolve a French direction.
-    let directionId = body.directionId;
-    if (!directionId) {
-      const directions = await listFrenchDirections();
-      if (directions.length === 0) {
-        throw new Error('Aucune direction française disponible chez Zadarma');
-      }
-      directionId = directions[0].id;
+    // 1. Vapi: create a SIP phone-number for this assistant. The unique part of
+    //    the SIP URI is derived from the assistantId so collisions are impossible.
+    const sipUser = `bot-${sanitiseAssistantId(body.assistantId)}`;
+    const sipUri = `sip:${sipUser}@sip.vapi.ai`;
+    const vapiSip = await createVapiSipNumber(sipUri, body.assistantId, vapiKey);
+
+    // 2. Telnyx: find an available French number and order it.
+    const available = await listAvailableFrenchNumbers(5);
+    if (available.length === 0) {
+      throw new Error('Aucun numéro français disponible chez Telnyx en ce moment');
+    }
+    const target = available[0].phone_number;
+    const order = await orderNumber(target);
+
+    if (order.status === 'failure') {
+      throw new Error(`Telnyx a refusé la commande du numéro ${target}`);
     }
 
-    // 2. Find an available number in that direction.
-    const availables = await listAvailableNumbers(directionId);
-    if (availables.length === 0) {
+    // 3. Telnyx returns the number-orders entry. The actual phone-number
+    //    resource is created async — usually fast, but we poll briefly to
+    //    grab its id before patching it.
+    let phoneNumber = await findPhoneNumber(target);
+    for (let i = 0; i < 8 && !phoneNumber; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      phoneNumber = await findPhoneNumber(target);
+    }
+    if (!phoneNumber) {
       throw new Error(
-        `Aucun numéro disponible chez Zadarma pour direction ${directionId}. Réessaye plus tard.`,
+        `Numéro ${target} commandé mais pas encore activé. Patiente quelques minutes et réessaye.`,
       );
     }
-    const target = availables[0];
 
-    // 3. Order it.
-    const ordered = await orderNumber(target.id);
-    const acquired = ordered.number ?? target.number;
-    if (!acquired) {
-      throw new Error('Zadarma a accepté la commande mais n\'a pas retourné de numéro');
-    }
-    const cleanNumber = acquired.replace(/^\+/, '');
-
-    // 4. Point inbound calls at our Vapi SIP endpoint.
-    const sipUri = `+${cleanNumber}@sip.vapi.ai`;
-    await setExternalSipUri(cleanNumber, sipUri);
-
-    // 5. Register the number with Vapi against our shared Zadarma credential
-    //    and attach it to the assistant.
-    const vapiPhone = await createVapiPhoneNumber(
-      `+${cleanNumber}`,
-      credentialId,
-      body.assistantId,
-      apiKey,
-    );
+    // 4. Telnyx: route this number through our pre-configured SIP connection
+    //    (which points to sip.vapi.ai). Then rewrite the SIP INVITE to land
+    //    on the assistant-specific Vapi SIP URI.
+    await assignConnection(phoneNumber.id, connectionId);
+    await setVoiceTranslatedNumber(phoneNumber.id, sipUri);
 
     return NextResponse.json({
       success: true,
-      phoneNumber: `+${cleanNumber}`,
-      vapiPhoneNumberId: vapiPhone.id,
-      directionId,
+      phoneNumber: target,
+      vapiPhoneNumberId: vapiSip.id,
+      sipUri,
+      telnyxPhoneNumberId: phoneNumber.id,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';

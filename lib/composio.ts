@@ -162,9 +162,14 @@ export async function executeAction<TOut = unknown>(
   input: Record<string, unknown>,
 ): Promise<TOut> {
   const composio = getComposio();
+  // dangerouslySkipVersionCheck: true tells Composio to use the latest
+  // version of the tool. Without it, v3 rejects with "Toolkit version not
+  // specified". For our use case (we don't pin versions per-tenant), latest
+  // is correct — we accept that a Composio breaking change requires a deploy.
   const result = await composio.tools.execute(action, {
     userId,
     arguments: input,
+    dangerouslySkipVersionCheck: true,
   });
   return result as TOut;
 }

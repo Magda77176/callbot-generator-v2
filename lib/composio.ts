@@ -2,19 +2,19 @@
 // providers (Google Calendar, HubSpot, Brevo, Pipedrive, ...) so we don't have
 // to create our own Google Cloud Console app, go through verification, etc.
 //
-// The actual SDK exposes a `Composio` class with sub-clients. We only need:
-//   composio.connectedAccounts.initiate(...)   → start OAuth, returns redirect URL
-//   composio.connectedAccounts.get(id)         → check connection status
-//   composio.tools.execute(...)                → execute an action like GOOGLECALENDAR_FIND_FREE_SLOTS
+// We use the high-level toolkits.authorize() shortcut, which picks the default
+// auth config of the toolkit on the operator's Composio org. The only required
+// env var is COMPOSIO_API_KEY — Composio Managed Auth handles the rest.
 //
-// To use this you need TWO env vars:
-//   COMPOSIO_API_KEY                         (from Composio dashboard → API Keys)
-//   COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID  (created once: Composio dashboard → Auth Configs → Google Calendar → Use Composio Managed Auth)
+// SDK methods we touch:
+//   composio.toolkits.authorize(userId, toolkitSlug)   → start OAuth, returns redirect URL
+//   composio.connectedAccounts.get(id)                 → check connection status
+//   composio.tools.execute(toolSlug, { userId, arguments }) → run an action
 //
-// The auth config = your one-time setup. Composio Managed Auth means Composio
-// uses ITS google OAuth app (already verified by Google), so we skip the 6-8
-// week Google verification process entirely. The client's OAuth consent screen
-// says "Composio wants to access your calendar" rather than "Your App".
+// Composio Managed Auth means Composio uses ITS Google OAuth app (already
+// verified by Google), so we skip the 6-8 week Google verification and the
+// "100 testers max" limit. The client's OAuth consent screen says "Composio
+// wants to access your calendar".
 
 import { Composio } from '@composio/core';
 
@@ -38,22 +38,47 @@ export interface InitiateResult {
 }
 
 /**
+ * Provider registry. Maps our internal provider slug (used in
+ * assistant.metadata.connections.{slug}) to the Composio toolkit slug
+ * (lowercased, no separators — Composio's convention).
+ */
+export interface ProviderConfig {
+  /** Our internal slug, used as the key in assistant.metadata.connections */
+  slug: string;
+  /** User-facing label for buttons/banners */
+  label: string;
+  /** Composio toolkit slug (e.g. "googlecalendar"). Lowercase, no separator. */
+  composioToolkit: string;
+}
+
+export const PROVIDERS: Record<string, ProviderConfig> = {
+  google_calendar: {
+    slug: 'google_calendar',
+    label: 'Google Calendar',
+    composioToolkit: 'googlecalendar',
+  },
+};
+
+/**
  * Start an OAuth flow for a given tenant + provider. Returns a redirect URL
  * the user must visit to authorize.
  *
- * @param userId — your tenant identifier. We use the Vapi assistantId since
+ * Uses composio.toolkits.authorize which picks the org's default auth config
+ * for the toolkit — no per-provider env var needed.
+ *
+ * @param userId — tenant identifier. We use the Vapi assistantId since
  *   1 assistant = 1 tenant at this stage. Composio uses this to associate
  *   future actions with the right connection.
- * @param authConfigId — the Composio auth config ID for the provider. Created
- *   once in the Composio dashboard for each provider you support.
+ * @param providerSlug — our internal slug, e.g. "google_calendar"
  */
 export async function initiateConnection(
   userId: string,
-  authConfigId: string,
+  providerSlug: string,
 ): Promise<InitiateResult> {
+  const provider = PROVIDERS[providerSlug];
+  if (!provider) throw new Error(`Unknown provider: ${providerSlug}`);
   const composio = getComposio();
-  // Composio v3 API: connectedAccounts.initiate
-  const req = await composio.connectedAccounts.initiate(userId, authConfigId);
+  const req = await composio.toolkits.authorize(userId, provider.composioToolkit);
   return {
     redirectUrl: req.redirectUrl ?? '',
     connectionRequestId: req.id,
@@ -74,8 +99,8 @@ export async function getConnection(connectionId: string) {
  * custom tool webhook routes (Phase 2).
  *
  * @param userId — same tenant identifier passed to initiateConnection
- * @param action — Composio action slug, e.g. "GOOGLECALENDAR_FIND_FREE_SLOTS"
- * @param input — arguments matching the action's input schema
+ * @param action — Composio tool slug, e.g. "GOOGLECALENDAR_FIND_FREE_SLOTS"
+ * @param input — arguments matching the tool's input schema
  */
 export async function executeAction<TOut = unknown>(
   userId: string,
@@ -88,34 +113,4 @@ export async function executeAction<TOut = unknown>(
     arguments: input,
   });
   return result as TOut;
-}
-
-/**
- * Provider registry. Each provider needs an env var with its Composio auth
- * config ID. We centralise lookups here so adding a new provider is one entry.
- */
-export interface ProviderConfig {
-  slug: string;
-  label: string;
-  authConfigEnvVar: string;
-}
-
-export const PROVIDERS: Record<string, ProviderConfig> = {
-  google_calendar: {
-    slug: 'google_calendar',
-    label: 'Google Calendar',
-    authConfigEnvVar: 'COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID',
-  },
-};
-
-export function getAuthConfigId(providerSlug: string): string {
-  const cfg = PROVIDERS[providerSlug];
-  if (!cfg) throw new Error(`Unknown provider: ${providerSlug}`);
-  const id = process.env[cfg.authConfigEnvVar]?.trim();
-  if (!id) {
-    throw new Error(
-      `${cfg.authConfigEnvVar} not configured. Create an auth config in the Composio dashboard for ${cfg.label} and put its ID in env.`,
-    );
-  }
-  return id;
 }

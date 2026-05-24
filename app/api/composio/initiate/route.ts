@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/admin-auth';
-import { getAuthConfigId, initiateConnection, PROVIDERS } from '@/lib/composio';
+import { initiateConnection, PROVIDERS } from '@/lib/composio';
 
 // Body: { assistantId: string, provider: 'google_calendar' | ... }
 // Returns: { redirectUrl, connectionRequestId } — the operator's browser opens
@@ -34,9 +34,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const authConfigId = getAuthConfigId(provider);
     // userId = assistantId so future tool calls can fetch the right connection.
-    const res = await initiateConnection(assistantId, authConfigId);
+    // initiateConnection uses toolkits.authorize → no auth config ID needed,
+    // Composio picks the org's default auth config for this toolkit.
+    const res = await initiateConnection(assistantId, provider);
     return NextResponse.json({ success: true, ...res });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';

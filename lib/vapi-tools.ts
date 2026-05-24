@@ -26,10 +26,19 @@ const FR_STOPWORDS = new Set([
 ]);
 
 function emitTokens(phrase: string, boost: number, out: string[]): void {
-  for (const word of phrase.trim().split(/\s+/)) {
+  // Split on whitespace AND hyphens — Vapi's validator rejects multi-word
+  // tokens, and even hyphenated compounds occasionally fail validation.
+  // Then strip diacritics so "Trinité" → "Trinite", "Rivière" → "Riviere",
+  // matching what Deepgram's FR model emits in its ASCII-normalised form.
+  for (const raw of phrase.trim().split(/[\s\-]+/)) {
+    if (!raw) continue;
+    const word = raw.normalize('NFD').replace(/[̀-ͯ]/g, '');
     if (word.length < 3) continue;
     if (FR_STOPWORDS.has(word.toLowerCase())) continue;
-    out.push(`${word}:${boost}`);
+    // Drop any remaining non-alphanumeric chars (apostrophes, etc.) just in case
+    const clean = word.replace(/[^A-Za-z0-9]/g, '');
+    if (clean.length < 3) continue;
+    out.push(`${clean}:${boost}`);
   }
 }
 
@@ -37,14 +46,23 @@ export function buildTranscriberKeywords(
   sector: Sector,
   businessInfo: BusinessInfo,
 ): string[] {
-  const keywords: string[] = [];
+  const raw: string[] = [];
   if (businessInfo.name?.trim()) {
-    emitTokens(businessInfo.name.trim(), 3, keywords);
+    emitTokens(businessInfo.name.trim(), 3, raw);
   }
   if (sector === 'immobilier') {
-    for (const town of MARTINIQUE_TOWNS) emitTokens(town, 2, keywords);
+    for (const town of MARTINIQUE_TOWNS) emitTokens(town, 2, raw);
   }
-  return keywords;
+  // Dedupe — the same token can come from multiple phrases (e.g. "Sainte"
+  // from both "Sainte-Luce" and "Sainte-Anne"). Vapi may reject duplicates.
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const k of raw) {
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(k);
+  }
+  return out;
 }
 
 /**

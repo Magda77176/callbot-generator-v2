@@ -36,7 +36,11 @@ function buildRows(assistants: VapiAssistant[], calls: VapiCall[]): Row[] {
         .pop();
       return { assistant: a, usage, callCount: own.length, lastCallAt };
     })
-    .sort((a, b) => b.usage.totalMinutes - a.usage.totalMinutes);
+    // Sort by createdAt DESC — most recently deployed assistant on top.
+    // Previously sorted by total minutes which buried freshly-deployed bots
+    // (0 minutes) at the bottom, making the dashboard feel "out of date"
+    // after every deploy.
+    .sort((a, b) => (b.assistant.createdAt ?? '').localeCompare(a.assistant.createdAt ?? ''));
 }
 
 export default async function AssistantsPage() {

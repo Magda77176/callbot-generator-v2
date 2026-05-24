@@ -66,16 +66,19 @@ export function buildTranscriberKeywords(
 }
 
 /**
- * Deepgram transcriber config. nova-2-phonecall = trained on 8kHz telephony
- * audio, the right tier for an outbound/inbound voice agent. numerals=true
- * forces digit format ("39" not "trente-neuf") so phone-number parsing is
- * unambiguous. endpointing=400 leaves enough silence between dictated digits
- * to keep them as one utterance.
+ * Deepgram transcriber config. We tried nova-2-phonecall (trained on 8kHz
+ * telephony audio) but it only supports en/en-US — French isn't allowed.
+ * Falling back to nova-3-general, which is Deepgram's newest model and does
+ * support French, and is generally more accurate than nova-2 baseline.
+ *
+ * numerals=true forces digit format ("39" not "trente-neuf") so phone-number
+ * parsing is unambiguous. endpointing=400 leaves enough silence between
+ * dictated digits to keep them as one utterance.
  */
 export function buildTranscriberConfig(sector: Sector, businessInfo: BusinessInfo) {
   return {
     provider: 'deepgram' as const,
-    model: 'nova-2-phonecall',
+    model: 'nova-3-general',
     language: 'fr',
     numerals: true,
     smartFormat: true,

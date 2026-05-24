@@ -10,27 +10,39 @@ export interface Plan {
   overagePerMinuteEur: number;
 }
 
+// Pricing grid. Calibrated on operator cost ~0.05€/min (Vapi + LLM + STT/TTS,
+// excluding fixed Telnyx phone fees). Markup decreases with volume — typical
+// SaaS volume discount — while overage remains punitive enough to incentivize
+// upgrading rather than absorbing the spillover.
+//
+//                  Plan price   Coût Vapi   Markup   Marge brute
+//   Starter 199€   1000 min     ~50€        ~4x      75%
+//   Pro     399€   2500 min     ~125€       ~3.2x    69%
+//   Business 799€  6000 min     ~300€       ~2.66x   62%
+//
+// Overage is always >5x cost (0.20-0.30€/min vs 0.05€/min) → out-of-plan minutes
+// are very profitable, which is the upgrade lever.
 export const PLANS: Record<PlanId, Plan> = {
   starter: {
     id: 'starter',
     name: 'Starter',
-    monthlyEur: 99,
-    includedMinutes: 200,
-    overagePerMinuteEur: 0.5,
+    monthlyEur: 199,
+    includedMinutes: 1000,
+    overagePerMinuteEur: 0.3,
   },
   pro: {
     id: 'pro',
     name: 'Pro',
-    monthlyEur: 199,
-    includedMinutes: 500,
-    overagePerMinuteEur: 0.4,
+    monthlyEur: 399,
+    includedMinutes: 2500,
+    overagePerMinuteEur: 0.25,
   },
   business: {
     id: 'business',
     name: 'Business',
-    monthlyEur: 399,
-    includedMinutes: 1200,
-    overagePerMinuteEur: 0.3,
+    monthlyEur: 799,
+    includedMinutes: 6000,
+    overagePerMinuteEur: 0.2,
   },
 };
 

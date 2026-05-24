@@ -32,7 +32,7 @@ const NUMBERS: NumberCard[] = [
   { tone: 'orange', label: 'Faits & chiffres', subtle: true },
   { tone: 'dark', label: 'Secteurs supportés', count: 5, suffix: '+' },
   { tone: 'grey', label: 'Disponibilité', static: '24/7' },
-  { tone: 'light', label: 'À partir de', count: 99, suffix: '€' },
+  { tone: 'light', label: 'À partir de', count: 199, suffix: '€' },
 ];
 
 const SERVICES = [
@@ -349,7 +349,7 @@ export default function HomePage() {
             <div className="uppercase text-xs tracking-widest text-default mb-3">— Tarifs</div>
             <h2 className="display-section">
               À partir de <br />
-              <span className="text-default">99€</span> /mois
+              <span className="text-default">199€</span> /mois
             </h2>
           </div>
           <p className="md:col-span-2 text-base md:text-lg font-light leading-relaxed self-end max-w-xl">
@@ -364,9 +364,9 @@ export default function HomePage() {
             <div className="uppercase text-xs tracking-widest text-muted-foreground mb-2">
               Starter
             </div>
-            <div className="display-section text-4xl mb-4">99€</div>
+            <div className="display-section text-4xl mb-4">199€</div>
             <div className="text-xs text-muted-foreground uppercase tracking-widest mb-6">
-              200 min/mois · 0,50 €/min au-delà
+              1 000 min/mois · 0,30 €/min au-delà
             </div>
             <div className="text-sm font-light text-muted-foreground">
               Pour démarrer en douceur. Marco / Alex / Léa / Tom / Sophie. Email + SMS de
@@ -380,9 +380,9 @@ export default function HomePage() {
               Recommandé
             </span>
             <div className="uppercase text-xs tracking-widest text-neutral-500 mb-2">Pro</div>
-            <div className="display-section text-4xl mb-4">199€</div>
+            <div className="display-section text-4xl mb-4">399€</div>
             <div className="text-xs text-neutral-500 uppercase tracking-widest mb-6">
-              500 min/mois · 0,40 €/min au-delà
+              2 500 min/mois · 0,25 €/min au-delà
             </div>
             <div className="text-sm font-light text-neutral-700">
               Pour la majorité des établissements. Tarif au-delà réduit, support prioritaire,
@@ -395,9 +395,9 @@ export default function HomePage() {
             <div className="uppercase text-xs tracking-widest text-muted-foreground mb-2">
               Business
             </div>
-            <div className="display-section text-4xl mb-4">399€</div>
+            <div className="display-section text-4xl mb-4">799€</div>
             <div className="text-xs text-muted-foreground uppercase tracking-widest mb-6">
-              1200 min/mois · 0,30 €/min au-delà
+              6 000 min/mois · 0,20 €/min au-delà
             </div>
             <div className="text-sm font-light text-muted-foreground">
               Pour les gros volumes. Multi-bots inclus, support dédié, onboarding personnalisé.

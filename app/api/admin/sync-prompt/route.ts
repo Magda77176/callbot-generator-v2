@@ -4,8 +4,29 @@ import {
   CALLBOT_CONFIGS,
   buildPersonalizedPrompt,
   isSector,
+  type Sector,
 } from '@/lib/callbot-configs';
 import { getAssistant } from '@/lib/vapi-server';
+
+/**
+ * Older assistants — deployed before we started stamping sector in metadata
+ * — can still be identified via their name (which our wizard builds as
+ * `${persona} - ${businessName}`). Map persona → sector.
+ */
+const PERSONA_TO_SECTOR: Record<string, Sector> = {
+  marco: 'restaurant',
+  alex: 'immobilier',
+  léa: 'coiffeur',
+  lea: 'coiffeur',
+  tom: 'dentaire',
+  sophie: 'ecommerce',
+};
+
+function sectorFromName(name: string | undefined | null): Sector | null {
+  if (!name) return null;
+  const persona = name.split('-')[0].trim().toLowerCase();
+  return PERSONA_TO_SECTOR[persona] ?? null;
+}
 
 /**
  * Push the latest prompt for the assistant's sector onto an already-deployed
@@ -48,25 +69,42 @@ export async function POST(request: Request) {
   try {
     const existing = await getAssistant(body.assistantId);
     const meta = (existing.metadata as Record<string, unknown>) ?? {};
-    const sectorRaw = typeof meta.sector === 'string' ? meta.sector : undefined;
-    const businessName =
-      typeof meta.businessName === 'string' && meta.businessName.trim()
-        ? meta.businessName
-        : existing.name?.split(' - ').pop() || 'votre établissement';
+    const metaSectorRaw = typeof meta.sector === 'string' ? meta.sector : undefined;
 
-    if (!sectorRaw || !isSector(sectorRaw)) {
+    // 1. Prefer the stamped metadata sector
+    // 2. Fall back to parsing the assistant name (older assistants pre-4e947cf)
+    let sector: Sector | null = null;
+    if (metaSectorRaw && isSector(metaSectorRaw)) {
+      sector = metaSectorRaw;
+    } else {
+      sector = sectorFromName(existing.name);
+    }
+
+    if (!sector) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Cet assistant n'a pas de secteur dans ses metadata. Resync impossible sans redéploiement depuis le wizard.",
+            "Impossible de déduire le secteur (ni dans metadata, ni dans le nom de l'assistant). Redéploiement nécessaire.",
         },
         { status: 400 },
       );
     }
 
-    const config = CALLBOT_CONFIGS[sectorRaw];
+    const businessName =
+      typeof meta.businessName === 'string' && meta.businessName.trim()
+        ? meta.businessName
+        : existing.name?.split('-').slice(1).join('-').trim() || 'votre établissement';
+
+    const config = CALLBOT_CONFIGS[sector];
     const systemPrompt = buildPersonalizedPrompt(config, { name: businessName }, undefined);
+
+    // Backfill missing metadata while we're at it so future syncs are clean.
+    const mergedMetadata = {
+      ...meta,
+      sector,
+      ...(typeof meta.businessName === 'string' ? {} : { businessName }),
+    };
 
     const res = await fetch(`https://api.vapi.ai/assistant/${body.assistantId}`, {
       method: 'PATCH',
@@ -74,13 +112,14 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      // Patch only the model.systemPrompt — we keep everything else
-      // (voice, transcriber, tools, etc.) as the live assistant has them.
+      // Patch only model.systemPrompt + metadata — voice, transcriber,
+      // tools, etc. stay as the live assistant has them.
       body: JSON.stringify({
         model: {
           ...((existing as unknown as { model: object }).model ?? {}),
           systemPrompt,
         },
+        metadata: mergedMetadata,
       }),
     });
 
@@ -88,7 +127,12 @@ export async function POST(request: Request) {
       throw new Error(`Vapi PATCH ${res.status}: ${await res.text().catch(() => '')}`);
     }
 
-    return NextResponse.json({ success: true, promptLength: systemPrompt.length });
+    return NextResponse.json({
+      success: true,
+      promptLength: systemPrompt.length,
+      sector,
+      backfilled: !metaSectorRaw,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

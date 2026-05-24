@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { CountUp } from '@/components/count-up';
+import { HomeDemoCall } from '@/components/home-demo-call';
 
 interface NumberCard {
   tone: 'orange' | 'dark' | 'grey' | 'light';
@@ -75,41 +76,6 @@ const FAQ = [
     a: 'Oui, sans engagement. Résiliable à la fin de chaque mois sans frais. Le frais de setup unique reste dû.',
   },
 ];
-
-function CallMock() {
-  return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-background">
-        <div className="flex items-center gap-2">
-          <div className="size-1.5 rounded-full bg-default pulse-dot" />
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            En cours
-          </span>
-        </div>
-        <span className="text-[10px] font-mono text-muted-foreground">00:42</span>
-      </div>
-      <div className="p-4 space-y-2 text-xs">
-        <div className="bg-muted rounded-lg px-3 py-1.5">
-          Réservation pour 4 vendredi 20h
-        </div>
-        <div className="bg-default/15 ring-1 ring-default/30 rounded-lg px-3 py-1.5 text-right">
-          C&apos;est noté, à quel nom ?
-        </div>
-        <div className="bg-muted rounded-lg px-3 py-1.5">
-          Dupont, 06 12 34 56 78
-        </div>
-        <div className="bg-default/15 ring-1 ring-default/30 rounded-lg px-3 py-1.5 inline-flex items-center gap-1 ml-auto">
-          <span className="size-1 rounded-full bg-foreground/60 typing-dot" />
-          <span className="size-1 rounded-full bg-foreground/60 typing-dot" />
-          <span className="size-1 rounded-full bg-foreground/60 typing-dot" />
-        </div>
-      </div>
-      <div className="px-4 py-2.5 border-t border-border bg-background text-[10px] uppercase tracking-wider text-default">
-        ✓ Résa enregistrée
-      </div>
-    </div>
-  );
-}
 
 export default function HomePage() {
   return (
@@ -349,28 +315,29 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* LIVE CALL feature */}
+      {/* LIVE CALL feature — real Vapi web demo */}
       <section className="max-w-[1400px] mx-auto px-6 lg:px-12 py-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
+            <div className="uppercase text-xs tracking-widest text-default mb-3">— Démo en direct</div>
             <h2 className="display-section mb-6">
-              En appel <br /> en direct
+              Parlez au bot <br /> maintenant
             </h2>
             <p className="text-base md:text-lg font-light leading-relaxed max-w-lg mb-6">
-              Pendant l&apos;appel, le bot collecte les infos en parlant, déclenche des fonctions
-              en arrière-plan (création d&apos;événement, envoi de SMS), et vous notifie en temps
-              réel.
+              Pas de formulaire, pas d&apos;inscription. Cliquez sur Démarrer à droite, autorisez
+              le micro, parlez au bot comme si vous l&apos;appeliez. Vous entendez sa voix,
+              voyez le transcript en direct.
             </p>
             <Link
               href="/builder"
               className="group flex items-center gap-3 border-b border-default pb-1 uppercase text-sm tracking-widest hover:gap-5 transition-all w-fit"
             >
-              <span>Essayer maintenant</span>
+              <span>Créer mon propre bot</span>
               <ArrowUpRight className="size-4 text-default transition-transform group-hover:rotate-45" />
             </Link>
           </div>
           <div className="md:max-w-md md:mx-auto w-full">
-            <CallMock />
+            <HomeDemoCall />
           </div>
         </div>
       </section>

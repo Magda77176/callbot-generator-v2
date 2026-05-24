@@ -63,8 +63,14 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
  * Start an OAuth flow for a given tenant + provider. Returns a redirect URL
  * the user must visit to authorize.
  *
- * Uses composio.toolkits.authorize which picks the org's default auth config
- * for the toolkit — no per-provider env var needed.
+ * Implementation notes:
+ * - The legacy `connectedAccounts.initiate(userId, authConfigId)` endpoint is
+ *   deprecated by Composio for Composio-managed OAuth configs (returns 400 with
+ *   message redirecting to /connected_accounts/link). We use `link()` instead.
+ * - `toolkits.authorize` is a higher-level wrapper but it currently calls the
+ *   deprecated endpoint internally → we go one level lower.
+ * - We auto-discover the auth config ID by listing Composio-managed configs
+ *   for the toolkit. This keeps the single-env-var setup (just COMPOSIO_API_KEY).
  *
  * @param userId — tenant identifier. We use the Vapi assistantId since
  *   1 assistant = 1 tenant at this stage. Composio uses this to associate
@@ -78,7 +84,24 @@ export async function initiateConnection(
   const provider = PROVIDERS[providerSlug];
   if (!provider) throw new Error(`Unknown provider: ${providerSlug}`);
   const composio = getComposio();
-  const req = await composio.toolkits.authorize(userId, provider.composioToolkit);
+
+  // Discover an enabled Composio-managed auth config for the toolkit. This
+  // is created when you activate the toolkit in the Composio dashboard.
+  const list = await composio.authConfigs.list({
+    toolkit: provider.composioToolkit,
+    isComposioManaged: true,
+  });
+  const enabled = (list.items ?? []).filter((c) => c.status === 'ENABLED');
+  if (enabled.length === 0) {
+    throw new Error(
+      `Aucune auth config Composio-managed activée pour le toolkit "${provider.composioToolkit}". Dans le dashboard Composio → Toolkits → ${provider.label} → "Connect" / "Enable".`,
+    );
+  }
+  const authConfigId = enabled[0].id;
+
+  // Use .link() — the current Composio-managed OAuth endpoint
+  // (`.initiate()` is deprecated for Composio-managed configs).
+  const req = await composio.connectedAccounts.link(userId, authConfigId);
   return {
     redirectUrl: req.redirectUrl ?? '',
     connectionRequestId: req.id,

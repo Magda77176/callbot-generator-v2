@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { ChevronLeft, Mic } from 'lucide-react';
+import { AlertTriangle, Check, ChevronLeft, Mic } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
-import { PLANS, computeUsage, fmtEur, readMeta, type PlanId } from '@/lib/billing';
+import { PLANS, computeUsage, fmtEur, readMeta } from '@/lib/billing';
 import {
   fmtDate,
   fmtDuration,
@@ -9,6 +9,7 @@ import {
   listCalls,
   durationSeconds,
 } from '@/lib/vapi-server';
+import { ConnectProviderButton } from '@/components/connect-provider-button';
 import { PlanSelector } from './plan-selector';
 import { SyncPromptButton } from './sync-prompt-button';
 
@@ -16,10 +17,16 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    connect_status?: 'success' | 'error' | 'pending';
+    provider?: string;
+    reason?: string;
+  }>;
 }
 
-export default async function AssistantDetailPage({ params }: PageProps) {
+export default async function AssistantDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const { connect_status, provider: connectProvider, reason } = await searchParams;
   let assistant;
   let calls;
   try {
@@ -36,6 +43,9 @@ export default async function AssistantDetailPage({ params }: PageProps) {
 
   const meta = readMeta(assistant);
   const usage = computeUsage(assistant, meta, calls);
+  // Composio connections live in metadata.connections.{provider} = connectionId.
+  const rawMeta = (assistant.metadata ?? {}) as Record<string, unknown>;
+  const connections = (rawMeta.connections as Record<string, string> | undefined) ?? {};
   const recent = [...calls]
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))
     .slice(0, 10);
@@ -114,6 +124,62 @@ export default async function AssistantDetailPage({ params }: PageProps) {
             {fmtEur(usage.overageEur)}.
           </p>
         )}
+      </div>
+
+      {/* OAuth connections — Composio */}
+      <div className="border border-border bg-card rounded-md p-6 space-y-4">
+        <div>
+          <div className="uppercase text-xs tracking-widest text-default mb-2">
+            Intégrations connectées
+          </div>
+          <p className="text-sm font-light text-muted-foreground">
+            Connecte le compte du client pour que son bot puisse créer des événements dans
+            SON Google Calendar (et plus tard CRM, email pro, etc.).
+          </p>
+        </div>
+
+        {connect_status === 'success' && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-md border border-emerald-500/30 bg-emerald-500/5">
+            <Check className="size-4 text-emerald-400 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-emerald-200">
+                {connectProvider ?? 'Provider'} connecté avec succès
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Le bot peut maintenant accéder à ce compte via son tool.
+              </div>
+            </div>
+          </div>
+        )}
+        {connect_status === 'error' && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-md border border-red-500/30 bg-red-500/5">
+            <AlertTriangle className="size-4 text-red-400 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-red-200">Échec de connexion</div>
+              {reason && (
+                <div className="text-xs text-muted-foreground mt-0.5 font-mono">{reason}</div>
+              )}
+            </div>
+          </div>
+        )}
+        {connect_status === 'pending' && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-md border border-amber-500/30 bg-amber-500/5">
+            <AlertTriangle className="size-4 text-amber-400 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-amber-200">Connexion en attente</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Le grant OAuth n&apos;est pas encore validé côté Composio. Recommence si besoin.
+              </div>
+            </div>
+          </div>
+        )}
+
+        <ConnectProviderButton
+          assistantId={assistant.id}
+          provider="google_calendar"
+          label="Google Calendar"
+          alreadyConnected={!!connections.google_calendar}
+        />
       </div>
 
       {/* Metadata */}

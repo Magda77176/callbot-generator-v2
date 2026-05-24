@@ -7,6 +7,7 @@ import {
   type Sector,
 } from '@/lib/callbot-configs';
 import { getAssistant } from '@/lib/vapi-server';
+import { buildToolsForSector, createVapiTool } from '@/lib/vapi-tools';
 
 /**
  * Older assistants — deployed before we started stamping sector in metadata
@@ -142,6 +143,20 @@ export async function POST(request: Request) {
       backoffSeconds: 1.0,
     };
 
+    // Recreate all tools from the current source of truth (lib/vapi-tools.ts).
+    // This is how we migrate Alex from the legacy Vapi-built-in calendar
+    // tools (single-tenant Nango) to the custom Composio-backed ones
+    // (per-tenant connections). Old tool IDs stay in Vapi's tool list
+    // unreferenced — cleanup is a future concern.
+    const webhookUrl = process.env.VAPI_WEBHOOK_URL?.trim();
+    if (!webhookUrl) {
+      throw new Error('VAPI_WEBHOOK_URL not configured');
+    }
+    const toolSpecs = buildToolsForSector(sector, webhookUrl);
+    const toolIds = toolSpecs.length
+      ? await Promise.all(toolSpecs.map((spec) => createVapiTool(spec, apiKey)))
+      : [];
+
     const res = await fetch(`https://api.vapi.ai/assistant/${body.assistantId}`, {
       method: 'PATCH',
       headers: {
@@ -152,6 +167,7 @@ export async function POST(request: Request) {
         model: {
           ...((existing as unknown as { model: object }).model ?? {}),
           systemPrompt,
+          ...(toolIds.length > 0 ? { toolIds } : {}),
         },
         voice: voicePatch,
         startSpeakingPlan,
@@ -169,6 +185,7 @@ export async function POST(request: Request) {
       promptLength: systemPrompt.length,
       sector,
       voiceSpeedApplied: -0.2,
+      toolIdsCreated: toolIds.length,
       backfilled: !metaSectorRaw,
     });
   } catch (e) {

@@ -10,6 +10,7 @@ import {
 import type { ModelOption } from '@/lib/builder-types';
 import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
 import { checkLimit, clientIp, deployLimiter, rateLimitHeaders } from '@/lib/rate-limit';
+import { buildToolsForSector, createVapiTool } from '@/lib/vapi-tools';
 
 const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
 const DEFAULT_MODEL: ModelOption = 'gpt-4o-mini';
@@ -35,118 +36,6 @@ function vapiModelConfig(option: ModelOption): { provider: string; model: string
     case 'claude-sonnet-4-6':
       return { provider: 'anthropic', model: 'claude-sonnet-4-5' };
   }
-}
-
-function reservationToolSpec(webhookUrl: string) {
-  return {
-    type: 'function',
-    function: {
-      name: 'record_reservation',
-      description:
-        "Enregistre une réservation confirmée par le client. À appeler UNIQUEMENT après que tous les champs ont été reconfirmés à voix haute. C'est cet appel qui sauvegarde la réservation côté restaurateur — tant qu'il n'a pas eu lieu, la réservation n'existe pas.",
-      parameters: {
-        type: 'object',
-        properties: {
-          date: {
-            type: 'string',
-            description: 'Date de la réservation au format ISO AAAA-MM-JJ (ex. 2026-05-25)',
-          },
-          time: {
-            type: 'string',
-            description:
-              "Heure de la réservation au format 24h HH:MM (ex. 19:30 pour sept heures et demie du soir)",
-          },
-          partySize: {
-            type: 'integer',
-            description: 'Nombre de personnes (entier ≥ 1)',
-            minimum: 1,
-          },
-          customerName: {
-            type: 'string',
-            description: 'Nom du client tel que reconfirmé à voix haute',
-          },
-          customerPhone: {
-            type: 'string',
-            description: 'Numéro français à 10 chiffres formaté "06 12 34 56 78"',
-          },
-          dietaryNotes: {
-            type: 'string',
-            description: 'Allergies, régimes spéciaux mentionnés. Chaîne vide si rien.',
-          },
-          specialRequests: {
-            type: 'string',
-            description:
-              'Demandes particulières (anniversaire, table fenêtre, accès PMR…). Chaîne vide si rien.',
-          },
-        },
-        required: ['date', 'time', 'partySize', 'customerName', 'customerPhone'],
-      },
-    },
-    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET?.trim() },
-  };
-}
-
-function leadToolSpec(webhookUrl: string) {
-  return {
-    type: 'function',
-    function: {
-      name: 'record_lead',
-      description:
-        "Enregistre un lead immobilier qualifié. À appeler UNIQUEMENT après collecte des infos qualifiantes et reconfirmation orale du nom et du téléphone. C'est cet appel qui transmet le lead à l'agence pour rappel.",
-      parameters: {
-        type: 'object',
-        properties: {
-          leadType: {
-            type: 'string',
-            enum: ['buyer', 'renter', 'seller', 'estimation', 'other'],
-            description:
-              "Catégorie : buyer=acheteur, renter=locataire, seller=vendeur, estimation=demande d'estimation, other=autre",
-          },
-          customerName: {
-            type: 'string',
-            description: 'Nom complet du contact tel que reconfirmé à voix haute',
-          },
-          customerPhone: {
-            type: 'string',
-            description: 'Numéro français à 10 chiffres formaté "06 12 34 56 78"',
-          },
-          propertyType: {
-            type: 'string',
-            description: 'Type de bien (appartement, maison, terrain, local). Vide si non pertinent.',
-          },
-          zones: {
-            type: 'string',
-            description:
-              'Zones recherchées (acheteur/locataire) OU adresse précise du bien (vendeur/estimation)',
-          },
-          budget: {
-            type: 'string',
-            description: "Budget en clair, ex. \"300 à 400 000 euros\" ou \"1200 euros par mois\"",
-          },
-          rooms: {
-            type: 'integer',
-            description: 'Nombre de pièces souhaitées. 0 si non précisé.',
-            minimum: 0,
-          },
-          timing: {
-            type: 'string',
-            description: 'Timing du projet ("urgent", "3 mois", "6 mois", "pas pressé"…)',
-          },
-          mustHaves: {
-            type: 'string',
-            description: 'Critères importants en clair texte (extérieur, parking…). Vide si rien.',
-          },
-          notes: {
-            type: 'string',
-            description:
-              "Autres infos pertinentes (état du bien, financement déjà obtenu, contexte spécial). Vide si rien.",
-          },
-        },
-        required: ['leadType', 'customerName', 'customerPhone'],
-      },
-    },
-    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET?.trim() },
-  };
 }
 
 // Common French regional proper nouns that Deepgram's baseline FR model
@@ -190,37 +79,8 @@ function buildTranscriberKeywords(sector: Sector, businessInfo: BusinessInfo): s
   return keywords;
 }
 
-function buildToolsForSector(sector: Sector, webhookUrl: string) {
-  switch (sector) {
-    case 'restaurant':
-      return [reservationToolSpec(webhookUrl)];
-    case 'immobilier':
-      return [leadToolSpec(webhookUrl)];
-    default:
-      return [];
-  }
-}
-
-// Vapi requires tools to be created as standalone resources first (via POST
-// /tool), then referenced from an assistant by ID (model.toolIds). Inline
-// model.tools is not supported — Vapi accepts the payload silently but
-// doesn't register the function with its server-side routing.
-async function createVapiTool(toolSpec: object, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.vapi.ai/tool', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(toolSpec),
-  });
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Vapi tool create failed: ${res.status} - ${errorText}`);
-  }
-  const data = (await res.json()) as { id: string };
-  return data.id;
-}
+// Tool specs + createVapiTool now live in lib/vapi-tools.ts so deploy and
+// sync-prompt share the same source of truth.
 
 interface DeployRequestBody {
   sector?: string;
@@ -282,18 +142,14 @@ async function deployToVapi(
     ? await Promise.all(toolSpecs.map((spec) => createVapiTool(spec, apiKey)))
     : [];
 
-  // Pre-existing Vapi tools (Google Calendar built-ins created by the user in
-  // the Vapi dashboard with their own OAuth connection). For immobilier we
-  // pull the IDs from env so the bot can check availability and book visits.
-  const staticToolIds: string[] = [];
-  if (config.sector === 'immobilier') {
-    const availabilityId = process.env.VAPI_TOOL_AVAILABILITY_ID?.trim();
-    const eventId = process.env.VAPI_TOOL_EVENT_ID?.trim();
-    if (availabilityId) staticToolIds.push(availabilityId);
-    if (eventId) staticToolIds.push(eventId);
-  }
-
-  const toolIds = [...dynamicToolIds, ...staticToolIds];
+  // The legacy Vapi-built-in calendar tools (VAPI_TOOL_AVAILABILITY_ID /
+  // VAPI_TOOL_EVENT_ID) are intentionally NOT pulled here anymore — they're
+  // single-tenant, scoped to the operator's Nango connection in the Vapi
+  // dashboard, and incompatible with our multi-tenant Composio model. We now
+  // create check_calendar_availability + book_calendar_event as custom tools
+  // (see buildToolsForSector) whose serverUrl routes to /api/tools/calendar
+  // and uses the assistant's own Composio connection.
+  const toolIds = dynamicToolIds;
 
   // Stamp the assistant with the operator-side metadata we need later for
   // billing and back-office display. The plan defaults to Starter; the

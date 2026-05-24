@@ -10,6 +10,7 @@ import {
   durationSeconds,
 } from '@/lib/vapi-server';
 import { PlanSelector } from './plan-selector';
+import { SyncPromptButton } from './sync-prompt-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,14 +56,17 @@ export default async function AssistantDetailPage({ params }: PageProps) {
           <h1 className="display-section">{assistant.name || '(sans nom)'}</h1>
           <p className="text-muted-foreground mt-2 font-mono text-xs">{assistant.id}</p>
         </div>
-        <Link
-          href={`/test/${assistant.id}`}
-          target="_blank"
-          className={buttonVariants({ size: 'lg' }) + ' btn-elevated'}
-        >
-          <Mic className="size-4" />
-          Tester ce bot
-        </Link>
+        <div className="flex items-center gap-3">
+          <SyncPromptButton assistantId={assistant.id} />
+          <Link
+            href={`/test/${assistant.id}`}
+            target="_blank"
+            className={buttonVariants({ size: 'lg' }) + ' btn-elevated'}
+          >
+            <Mic className="size-4" />
+            Tester ce bot
+          </Link>
+        </div>
       </div>
 
       {/* Plan management */}

@@ -142,9 +142,9 @@ export async function POST(request: Request) {
     };
 
     const stopSpeakingPlan = {
-      numWords: 2,
-      voiceSeconds: 0.2,
-      backoffSeconds: 1.0,
+      numWords: 1,
+      voiceSeconds: 0.3,
+      backoffSeconds: 0.5,
     };
 
     // Recreate all tools from the current source of truth (lib/vapi-tools.ts).

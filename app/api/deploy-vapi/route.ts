@@ -178,13 +178,14 @@ async function deployToVapi(
     //   - onNumberSeconds 0.5 = pauses between digits (phone numbers)
     //
     // stopSpeakingPlan: when does the bot SHUT UP because the user is talking?
-    //   - numWords 2 = user must say 2+ words to interrupt; protects from
-    //     stray "oui"/"hmm" backchannel ("D'accord" alone won't interrupt)
-    //     but allows real interjections like "non attendez", "stop arrête",
-    //     "pardon je voulais dire"
-    //   - voiceSeconds 0.2 = how long the user has to be speaking before
-    //     we count their interruption
-    //   - backoffSeconds 1.0 = wait 1s after being interrupted before
+    //   - numWords 1 = a single word ("non", "stop", "attendez") is enough
+    //     to interrupt. Previously 2, which felt unresponsive: user said
+    //     "non" and the bot kept monologuing.
+    //   - voiceSeconds 0.3 = user must be speaking for 300ms before we
+    //     count their interruption. Filters out ~200ms backchannel like
+    //     "hmm" but lets real interjections through ("non" ≈ 300ms,
+    //     "stop" ≈ 400ms, "attendez" ≈ 500ms).
+    //   - backoffSeconds 0.5 = wait 0.5s after being interrupted before
     //     starting to talk again
     startSpeakingPlan: {
       transcriptionEndpointingPlan: {
@@ -195,9 +196,9 @@ async function deployToVapi(
       waitSeconds: 0.4,
     },
     stopSpeakingPlan: {
-      numWords: 2,
-      voiceSeconds: 0.2,
-      backoffSeconds: 1.0,
+      numWords: 1,
+      voiceSeconds: 0.3,
+      backoffSeconds: 0.5,
     },
     endCallPhrases: END_CALL_PHRASES,
     silenceTimeoutSeconds: 20,

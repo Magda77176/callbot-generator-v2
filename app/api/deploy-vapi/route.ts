@@ -355,9 +355,37 @@ async function deployToVapi(
     },
     backchannelingEnabled: true,
     backgroundDenoisingEnabled: true,
-    // Raised from 2 → 5 so a "oui" / "hmm" / "ah ok" doesn't interrupt the bot
-    // mid-sentence. Cuts down on phrases stopping abruptly.
-    numWordsToInterruptAssistant: 5,
+    // Modern Vapi speech pipeline config (replaces legacy
+    // numWordsToInterruptAssistant). French-tuned per Vapi's docs.
+    //
+    // startSpeakingPlan.transcriptionEndpointingPlan: when does Vapi consider
+    // the user finished talking and trigger the LLM?
+    //   - onPunctuationSeconds 0.1 = user ended with . or ? → react fast
+    //   - onNoPunctuationSeconds 1.5 = mid-sentence pause → wait longer
+    //   - onNumberSeconds 0.5 = pauses between digits (phone numbers)
+    //
+    // stopSpeakingPlan: when does the bot SHUT UP because the user is talking?
+    //   - numWords 2 = user must say 2+ words to interrupt; protects from
+    //     stray "oui"/"hmm" backchannel ("D'accord" alone won't interrupt)
+    //     but allows real interjections like "non attendez", "stop arrête",
+    //     "pardon je voulais dire"
+    //   - voiceSeconds 0.2 = how long the user has to be speaking before
+    //     we count their interruption
+    //   - backoffSeconds 1.0 = wait 1s after being interrupted before
+    //     starting to talk again
+    startSpeakingPlan: {
+      transcriptionEndpointingPlan: {
+        onPunctuationSeconds: 0.1,
+        onNoPunctuationSeconds: 1.5,
+        onNumberSeconds: 0.5,
+      },
+      waitSeconds: 0.4,
+    },
+    stopSpeakingPlan: {
+      numWords: 2,
+      voiceSeconds: 0.2,
+      backoffSeconds: 1.0,
+    },
     endCallPhrases: END_CALL_PHRASES,
     silenceTimeoutSeconds: 20,
     responseDelaySeconds: 0.4,

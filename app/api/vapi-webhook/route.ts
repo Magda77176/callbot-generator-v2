@@ -300,7 +300,15 @@ async function handleToolCall(
     const validated = validateLead(parsed);
     if (!validated.ok) {
       console.warn(`[vapi-webhook] record_lead rejected: ${validated.error}`, { callId, parsed });
-      return { toolCallId, result: `Erreur d'enregistrement: ${validated.error}` };
+      // Directive error format: the bot reads this string back from the tool
+      // result. Phrasing it as an INSTRUCTION the LLM can act on (rather
+      // than a flat error string) helps the bot recover by asking the
+      // client for the missing info instead of saying "Erreur Vapi" and
+      // freezing.
+      return {
+        toolCallId,
+        result: `INSTRUCTION SYSTÈME : Le lead n'a pas pu être enregistré car ${validated.error}. Tu DOIS maintenant demander oralement au client les champs manquants (nom complet + téléphone à dix chiffres) en suivant le PROTOCOLE TÉLÉPHONE niveau 1, puis tu rappelles record_lead avec tous les champs remplis. NE PRONONCE PAS le mot "erreur" au client — formule comme une suite normale de l'appel.`,
+      };
     }
     console.log('[vapi-webhook] lead', { callId, ...validated.value });
     await deliverLeadConfirmations(validated.value);

@@ -323,10 +323,16 @@ async function deployToVapi(
       voiceId,
       model: 'sonic-3',
       language: 'fr',
-      // Larger chunks (60 chars vs default ~30) and sentence-end boundaries only
-      // prevent the "phrases hachées" pattern where TTS cuts mid-clause and the
-      // bot sounds like it's stuttering through sub-fragments. Marco got this
-      // tuning inline in 2c4c4cf — promoting it to the deploy default.
+      // Slow Cartesia down ~20% via experimentalControls.speed (range -1..1).
+      // User feedback: "parle vite, pas d'intonation, pas de ponctuation".
+      // At default speed (1.0), Cartesia rushes through commas. At -0.2 the
+      // pacing matches what a French phone agent actually sounds like and
+      // commas get their natural audible pause.
+      experimentalControls: {
+        speed: -0.2,
+      },
+      // Larger chunks (60 chars vs default ~30) and sentence-end boundaries
+      // only prevent the "phrases hachées" pattern where TTS cuts mid-clause.
       chunkPlan: {
         enabled: true,
         minCharacters: 60,

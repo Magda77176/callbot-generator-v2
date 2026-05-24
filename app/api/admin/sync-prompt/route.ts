@@ -106,19 +106,56 @@ export async function POST(request: Request) {
       ...(typeof meta.businessName === 'string' ? {} : { businessName }),
     };
 
+    // Preserve the operator-chosen voiceId from the deployed assistant, but
+    // refresh ALL other voice/transcriber/speaking-plan tuning from our latest
+    // defaults. This makes Resync push the full latest config (slower TTS,
+    // updated stopSpeakingPlan, etc.) without forcing a redeploy from the
+    // wizard.
+    const existingVoiceId =
+      (existing as unknown as { voice?: { voiceId?: string } }).voice?.voiceId;
+
+    const voicePatch = {
+      provider: 'cartesia' as const,
+      voiceId: existingVoiceId,
+      model: 'sonic-3',
+      language: 'fr',
+      experimentalControls: { speed: -0.2 },
+      chunkPlan: {
+        enabled: true,
+        minCharacters: 60,
+        punctuationBoundaries: ['.', '!', '?'],
+      },
+    };
+
+    const startSpeakingPlan = {
+      transcriptionEndpointingPlan: {
+        onPunctuationSeconds: 0.1,
+        onNoPunctuationSeconds: 1.5,
+        onNumberSeconds: 0.5,
+      },
+      waitSeconds: 0.4,
+    };
+
+    const stopSpeakingPlan = {
+      numWords: 2,
+      voiceSeconds: 0.2,
+      backoffSeconds: 1.0,
+    };
+
     const res = await fetch(`https://api.vapi.ai/assistant/${body.assistantId}`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      // Patch only model.systemPrompt + metadata — voice, transcriber,
-      // tools, etc. stay as the live assistant has them.
       body: JSON.stringify({
         model: {
           ...((existing as unknown as { model: object }).model ?? {}),
           systemPrompt,
         },
+        voice: voicePatch,
+        startSpeakingPlan,
+        stopSpeakingPlan,
         metadata: mergedMetadata,
       }),
     });
@@ -131,6 +168,7 @@ export async function POST(request: Request) {
       success: true,
       promptLength: systemPrompt.length,
       sector,
+      voiceSpeedApplied: -0.2,
       backfilled: !metaSectorRaw,
     });
   } catch (e) {

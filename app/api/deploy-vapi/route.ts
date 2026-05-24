@@ -295,9 +295,22 @@ async function deployToVapi(
 
   const toolIds = [...dynamicToolIds, ...staticToolIds];
 
+  // Stamp the assistant with the operator-side metadata we need later for
+  // billing and back-office display. The plan defaults to Starter; the
+  // operator can change it from /admin/assistants/[id].
+  const today = new Date().toISOString().slice(0, 10);
+  const assistantMetadata: Record<string, string> = {
+    plan: 'starter',
+    planStartDate: today,
+    businessName: businessInfo.name?.trim() || '',
+    sector: config.sector,
+    contactEmail: process.env.NOTIFICATION_EMAIL?.trim() || '',
+  };
+
   const payload = {
     name: `${config.name} - ${businessInfo.name || 'CallBot'}`,
     firstMessage: config.greeting.replace(/\{\{business_name\}\}/g, businessName),
+    metadata: assistantMetadata,
     model: {
       ...vapiModelConfig(overrides.model),
       temperature: overrides.temperature,

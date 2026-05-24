@@ -47,6 +47,26 @@ export interface VapiCallCostBreakdown {
   total?: number;
 }
 
+export interface VapiCallMessage {
+  role?: string;
+  // Conversational text on user / assistant messages
+  message?: string;
+  // Tool-call events carry these
+  name?: string;
+  toolCalls?: Array<{
+    id?: string;
+    type?: string;
+    function?: { name?: string; arguments?: string | Record<string, unknown> };
+  }>;
+  // Tool result events carry this
+  result?: string;
+  // Generic time field present on most events
+  time?: number;
+  secondsFromStart?: number;
+  // Sometimes errors propagate inline
+  error?: string;
+}
+
 export interface VapiCall {
   id: string;
   assistantId?: string;
@@ -62,6 +82,57 @@ export interface VapiCall {
   transcript?: string;
   summary?: string;
   recordingUrl?: string;
+  messages?: VapiCallMessage[];
+}
+
+export interface ToolEvent {
+  kind: 'call' | 'result';
+  toolName: string;
+  arguments?: Record<string, unknown> | string;
+  result?: string;
+  error?: string;
+  secondsFromStart?: number;
+}
+
+/**
+ * Extract a chronological list of tool-call events + their results from a
+ * Vapi call's `messages` array. Used in the admin to debug whether/how the
+ * assistant invoked Vapi tools (Google Calendar, record_lead, etc.) during
+ * a call.
+ */
+export function extractToolEvents(call: VapiCall): ToolEvent[] {
+  const events: ToolEvent[] = [];
+  for (const m of call.messages ?? []) {
+    const role = m.role?.toLowerCase();
+    if (role === 'tool_calls' || role === 'tool-calls') {
+      for (const tc of m.toolCalls ?? []) {
+        const name = tc.function?.name ?? 'unknown';
+        let args: Record<string, unknown> | string | undefined = tc.function?.arguments;
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args) as Record<string, unknown>;
+          } catch {
+            // keep as string
+          }
+        }
+        events.push({
+          kind: 'call',
+          toolName: name,
+          arguments: args,
+          secondsFromStart: m.secondsFromStart,
+        });
+      }
+    } else if (role === 'tool_call_result' || role === 'tool-call-result') {
+      events.push({
+        kind: 'result',
+        toolName: m.name ?? 'unknown',
+        result: m.result,
+        error: m.error,
+        secondsFromStart: m.secondsFromStart,
+      });
+    }
+  }
+  return events;
 }
 
 // -------- Public API --------

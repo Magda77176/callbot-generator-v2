@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Wrench } from 'lucide-react';
 import {
   durationSeconds,
+  extractToolEvents,
   fmtCost,
   fmtDate,
   fmtDuration,
@@ -76,6 +77,9 @@ export default async function CallDetailPage({ params }: PageProps) {
         </div>
       )}
 
+      {/* Tool calls — most useful diagnostic for booking failures */}
+      <ToolEventsPanel events={extractToolEvents(call)} />
+
       {/* Recording */}
       {call.recordingUrl && (
         <div className="border border-border bg-card rounded-md p-6 space-y-3">
@@ -136,6 +140,89 @@ function Stat({
         {label}
       </div>
       <div className={mono ? 'font-mono text-sm' : 'display-light text-xl'}>{value}</div>
+    </div>
+  );
+}
+
+function ToolEventsPanel({
+  events,
+}: {
+  events: ReturnType<typeof extractToolEvents>;
+}) {
+  if (events.length === 0) {
+    return (
+      <div className="border border-amber-500/30 bg-amber-500/5 rounded-md p-6">
+        <div className="flex items-center gap-2 uppercase text-xs tracking-widest text-amber-400 mb-2">
+          <AlertTriangle className="size-4" />
+          Aucun tool call détecté
+        </div>
+        <p className="text-sm font-light text-muted-foreground leading-relaxed">
+          Le bot n&apos;a invoqué aucune fonction pendant cet appel. Pour un appel qui devait
+          aboutir à un booking ou un lead enregistré, c&apos;est probablement la cause du
+          problème : le bot a dit &ldquo;c&apos;est calé&rdquo; à l&apos;oral mais n&apos;a pas
+          déclenché la fonction sous-jacente.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-border bg-card rounded-md p-6">
+      <div className="uppercase text-xs tracking-widest text-default mb-4 flex items-center gap-2">
+        <Wrench className="size-4" />
+        Tool calls ({events.length})
+      </div>
+      <div className="space-y-3">
+        {events.map((e, i) => {
+          const isCall = e.kind === 'call';
+          const hasError =
+            !!e.error || (typeof e.result === 'string' && /erreur|error|missing|failed/i.test(e.result));
+          return (
+            <div
+              key={i}
+              className={
+                'rounded-md border p-4 ' +
+                (hasError
+                  ? 'border-red-500/30 bg-red-500/5'
+                  : isCall
+                    ? 'border-default/30 bg-default/5'
+                    : 'border-emerald-500/30 bg-emerald-500/5')
+              }
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase tracking-widest font-semibold">
+                    {isCall ? '→ Call' : '← Result'}
+                  </span>
+                  <span className="font-mono text-xs">{e.toolName}</span>
+                </div>
+                {e.secondsFromStart !== undefined && (
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    @ {Math.round(e.secondsFromStart)}s
+                  </span>
+                )}
+              </div>
+              {isCall && e.arguments && (
+                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap bg-background/50 rounded p-3 max-h-48 overflow-auto">
+                  {typeof e.arguments === 'string'
+                    ? e.arguments
+                    : JSON.stringify(e.arguments, null, 2)}
+                </pre>
+              )}
+              {!isCall && (e.result || e.error) && (
+                <pre
+                  className={
+                    'text-xs font-mono whitespace-pre-wrap bg-background/50 rounded p-3 max-h-48 overflow-auto ' +
+                    (hasError ? 'text-red-300' : 'text-emerald-300')
+                  }
+                >
+                  {e.error ? `ERROR: ${e.error}` : e.result}
+                </pre>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

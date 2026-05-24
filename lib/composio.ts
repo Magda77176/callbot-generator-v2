@@ -71,15 +71,22 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
  *   deprecated endpoint internally → we go one level lower.
  * - We auto-discover the auth config ID by listing Composio-managed configs
  *   for the toolkit. This keeps the single-env-var setup (just COMPOSIO_API_KEY).
+ * - We MUST pass callbackUrl. Without it Composio shows its own success page
+ *   after OAuth and never redirects to our callback → metadata never gets
+ *   stamped on the Vapi assistant.
  *
  * @param userId — tenant identifier. We use the Vapi assistantId since
  *   1 assistant = 1 tenant at this stage. Composio uses this to associate
  *   future actions with the right connection.
  * @param providerSlug — our internal slug, e.g. "google_calendar"
+ * @param callbackUrl — where Composio redirects after the user approves OAuth.
+ *   Must point to our /api/composio/callback route with assistantId + provider
+ *   encoded so the callback knows what to patch.
  */
 export async function initiateConnection(
   userId: string,
   providerSlug: string,
+  callbackUrl: string,
 ): Promise<InitiateResult> {
   const provider = PROVIDERS[providerSlug];
   if (!provider) throw new Error(`Unknown provider: ${providerSlug}`);
@@ -99,13 +106,37 @@ export async function initiateConnection(
   }
   const authConfigId = enabled[0].id;
 
-  // Use .link() — the current Composio-managed OAuth endpoint
-  // (`.initiate()` is deprecated for Composio-managed configs).
-  const req = await composio.connectedAccounts.link(userId, authConfigId);
+  // Use .link() with explicit callbackUrl. Without callbackUrl Composio
+  // would show its own success page and never come back to us.
+  const req = await composio.connectedAccounts.link(userId, authConfigId, {
+    callbackUrl,
+  });
   return {
     redirectUrl: req.redirectUrl ?? '',
     connectionRequestId: req.id,
   };
+}
+
+/**
+ * List active connections for a tenant + toolkit. Used by the callback route
+ * to discover which connection was just created (Composio doesn't reliably
+ * pass the connection id back in the callback query string).
+ */
+export async function findActiveConnection(
+  userId: string,
+  providerSlug: string,
+): Promise<{ id: string } | null> {
+  const provider = PROVIDERS[providerSlug];
+  if (!provider) throw new Error(`Unknown provider: ${providerSlug}`);
+  const composio = getComposio();
+  const list = await composio.connectedAccounts.list({
+    userIds: [userId],
+    toolkitSlugs: [provider.composioToolkit],
+    statuses: ['ACTIVE'],
+    limit: 1,
+  });
+  const items = (list.items ?? []) as Array<{ id: string }>;
+  return items[0] ?? null;
 }
 
 /**

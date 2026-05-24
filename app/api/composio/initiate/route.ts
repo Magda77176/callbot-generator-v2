@@ -35,9 +35,13 @@ export async function POST(request: Request) {
 
   try {
     // userId = assistantId so future tool calls can fetch the right connection.
-    // initiateConnection uses toolkits.authorize → no auth config ID needed,
-    // Composio picks the org's default auth config for this toolkit.
-    const res = await initiateConnection(assistantId, provider);
+    // We build the callbackUrl with assistantId + provider encoded — the
+    // callback route uses these to know which Vapi assistant to patch.
+    const origin = new URL(request.url).origin;
+    const callbackUrl = `${origin}/api/composio/callback?assistantId=${encodeURIComponent(
+      assistantId,
+    )}&provider=${encodeURIComponent(provider)}`;
+    const res = await initiateConnection(assistantId, provider, callbackUrl);
     return NextResponse.json({ success: true, ...res });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';

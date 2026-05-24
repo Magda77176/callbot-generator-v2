@@ -1,37 +1,37 @@
 import { NextResponse } from 'next/server';
-import { getConnection } from '@/lib/composio';
+import { findActiveConnection } from '@/lib/composio';
 
-// Composio redirects here after the user approves the OAuth grant. The
-// connection ID arrives as a query parameter (Composio uses ?status=&id=
-// conventions). We verify the connection is active, then patch the assistant's
-// metadata to remember which provider got connected to which Composio
-// connection.
-//
-// NOTE: Composio's exact callback query param naming may vary. The current
-// pattern uses ?status=success&id=<connectedAccountId>&userId=<assistantId>&provider=<slug>.
-// We forward the user back to /admin/assistants/[assistantId] with a banner.
+// Composio redirects here after the user approves the OAuth grant. Our
+// /initiate route encodes assistantId + provider in the callbackUrl, so we
+// can read them back here directly. We then list the user's active
+// connections on Composio's side to discover the new connectionId (Composio
+// doesn't reliably append it to the callback URL).
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const status = url.searchParams.get('status');
-  const connectionId = url.searchParams.get('id') || url.searchParams.get('connectionId');
-  const assistantId = url.searchParams.get('userId') || url.searchParams.get('assistantId');
+  const assistantId = url.searchParams.get('assistantId');
   const provider = url.searchParams.get('provider') || 'google_calendar';
 
   const baseRedirect = assistantId
     ? `/admin/assistants/${assistantId}`
     : '/admin/assistants';
 
-  if (status !== 'success' || !connectionId || !assistantId) {
+  if (!assistantId) {
     return NextResponse.redirect(
-      new URL(`${baseRedirect}?connect_status=error&provider=${provider}`, request.url),
+      new URL(`${baseRedirect}?connect_status=error&provider=${provider}&reason=missing_assistantId`, request.url),
     );
   }
 
   try {
-    // Verify the connection is ACTIVE on Composio's side
-    const conn = await getConnection(connectionId);
-    const connStatus = (conn as { status?: string }).status;
-    if (connStatus !== 'ACTIVE') {
+    // Discover the connection that Composio just created for this user+toolkit.
+    // We may need a tiny retry loop if Composio hasn't fully written the row
+    // when it redirects us — usually it has, but we tolerate eventual
+    // consistency.
+    let conn = await findActiveConnection(assistantId, provider);
+    if (!conn) {
+      await new Promise((r) => setTimeout(r, 1000));
+      conn = await findActiveConnection(assistantId, provider);
+    }
+    if (!conn) {
       return NextResponse.redirect(
         new URL(
           `${baseRedirect}?connect_status=pending&provider=${provider}`,
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     const existing = (await existingRes.json()) as { metadata?: Record<string, unknown> };
     const meta = existing.metadata ?? {};
     const connections = (meta.connections as Record<string, string>) ?? {};
-    connections[provider] = connectionId;
+    connections[provider] = conn.id;
 
     const patchRes = await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
       method: 'PATCH',

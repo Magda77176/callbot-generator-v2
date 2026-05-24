@@ -10,7 +10,11 @@ import {
 import type { ModelOption } from '@/lib/builder-types';
 import { DEFAULT_VOICE_BY_PERSONA } from '@/lib/voices';
 import { checkLimit, clientIp, deployLimiter, rateLimitHeaders } from '@/lib/rate-limit';
-import { buildToolsForSector, createVapiTool } from '@/lib/vapi-tools';
+import {
+  buildToolsForSector,
+  buildTranscriberConfig,
+  createVapiTool,
+} from '@/lib/vapi-tools';
 
 const END_CALL_PHRASES = ['au revoir', 'bonne soirée', 'bonne journée'];
 const DEFAULT_MODEL: ModelOption = 'gpt-4o-mini';
@@ -38,46 +42,8 @@ function vapiModelConfig(option: ModelOption): { provider: string; model: string
   }
 }
 
-// Common French regional proper nouns that Deepgram's baseline FR model
-// frequently mis-transcribes. Boosting them via transcriber.keywords:
-// - "Sainte-Luce" stays as "Sainte-Luce" instead of becoming "Saint-Russe"
-// - "Schoelcher" doesn't get garbled
-// - The agency name itself gets the strongest boost
-//
-// TODO: extract these dynamically from the enriched context / businessInfo.
-// address once we serve agencies outside Martinique.
-const MARTINIQUE_TOWNS = [
-  'Schoelcher',
-  'Sainte-Luce',
-  'Sainte-Anne',
-  'Le Diamant',
-  'Fort-de-France',
-  'Le Marin',
-  'Case-Pilote',
-  'Le Robert',
-  'Le Morne-Rouge',
-  'Saint-Pierre',
-  'Terreville',
-  'Ravine Vilaine',
-  'Trinité',
-  'Le Lamentin',
-  'Ducos',
-  'Rivière-Salée',
-];
-
-function buildTranscriberKeywords(sector: Sector, businessInfo: BusinessInfo): string[] {
-  const keywords: string[] = [];
-  // Strongest boost on the business name itself — it's what the bot says in
-  // the greeting and what the caller might repeat back.
-  if (businessInfo.name?.trim()) {
-    keywords.push(`${businessInfo.name.trim()}:3`);
-  }
-  // Immobilier prospect is Martinique-based for now. Generalize when needed.
-  if (sector === 'immobilier') {
-    for (const town of MARTINIQUE_TOWNS) keywords.push(`${town}:2`);
-  }
-  return keywords;
-}
+// Transcriber config + keyword builder live in lib/vapi-tools.ts —
+// imported as buildTranscriberConfig above.
 
 // Tool specs + createVapiTool now live in lib/vapi-tools.ts so deploy and
 // sync-prompt share the same source of truth.
@@ -195,22 +161,7 @@ async function deployToVapi(
         punctuationBoundaries: ['.', '!', '?'],
       },
     },
-    transcriber: {
-      provider: 'deepgram',
-      model: 'nova-2',
-      language: 'fr',
-      // Critical for phone-number reliability: numerals=true forces Deepgram
-      // to emit "39" instead of "trente-neuf" (eliminates the phonetic
-      // ambiguity between trente-et-un / trente-neuf etc). smartFormat
-      // handles general number formatting. endpointing=300 leaves enough
-      // silence for the speaker to finish digit sequences without being cut.
-      numerals: true,
-      smartFormat: true,
-      endpointing: 300,
-      // Keyword boost for proper nouns Deepgram's FR baseline often misses
-      // (agency name + Martinique towns currently).
-      keywords: buildTranscriberKeywords(config.sector, businessInfo),
-    },
+    transcriber: buildTranscriberConfig(config.sector, businessInfo),
     server: {
       url: webhookUrl,
       secret: process.env.VAPI_WEBHOOK_SECRET?.trim(),

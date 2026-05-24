@@ -3,7 +3,51 @@
 // (/api/admin/sync-prompt) so both endpoints produce identical tool
 // configurations from the same source of truth.
 
-import type { Sector } from '@/lib/callbot-configs';
+import type { BusinessInfo, Sector } from '@/lib/callbot-configs';
+
+// Common French regional proper nouns that Deepgram's baseline FR model
+// frequently mis-transcribes. Boosting them via transcriber.keywords:
+// - "Sainte-Luce" stays as "Sainte-Luce" instead of becoming "Saint-Russe"
+// - "Schoelcher" doesn't get garbled
+const MARTINIQUE_TOWNS = [
+  'Schoelcher', 'Sainte-Luce', 'Sainte-Anne', 'Le Diamant', 'Fort-de-France',
+  'Le Marin', 'Case-Pilote', 'Le Robert', 'Le Morne-Rouge', 'Saint-Pierre',
+  'Terreville', 'Ravine Vilaine', 'Trinité', 'Le Lamentin', 'Ducos',
+  'Rivière-Salée',
+];
+
+export function buildTranscriberKeywords(
+  sector: Sector,
+  businessInfo: BusinessInfo,
+): string[] {
+  const keywords: string[] = [];
+  if (businessInfo.name?.trim()) {
+    keywords.push(`${businessInfo.name.trim()}:3`);
+  }
+  if (sector === 'immobilier') {
+    for (const town of MARTINIQUE_TOWNS) keywords.push(`${town}:2`);
+  }
+  return keywords;
+}
+
+/**
+ * Deepgram transcriber config. nova-2-phonecall = trained on 8kHz telephony
+ * audio, the right tier for an outbound/inbound voice agent. numerals=true
+ * forces digit format ("39" not "trente-neuf") so phone-number parsing is
+ * unambiguous. endpointing=400 leaves enough silence between dictated digits
+ * to keep them as one utterance.
+ */
+export function buildTranscriberConfig(sector: Sector, businessInfo: BusinessInfo) {
+  return {
+    provider: 'deepgram' as const,
+    model: 'nova-2-phonecall',
+    language: 'fr',
+    numerals: true,
+    smartFormat: true,
+    endpointing: 400,
+    keywords: buildTranscriberKeywords(sector, businessInfo),
+  };
+}
 
 export interface VapiToolSpec {
   type: 'function';

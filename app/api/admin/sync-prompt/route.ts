@@ -7,7 +7,11 @@ import {
   type Sector,
 } from '@/lib/callbot-configs';
 import { getAssistant } from '@/lib/vapi-server';
-import { buildToolsForSector, createVapiTool } from '@/lib/vapi-tools';
+import {
+  buildToolsForSector,
+  buildTranscriberConfig,
+  createVapiTool,
+} from '@/lib/vapi-tools';
 
 /**
  * Older assistants — deployed before we started stamping sector in metadata
@@ -157,6 +161,8 @@ export async function POST(request: Request) {
       ? await Promise.all(toolSpecs.map((spec) => createVapiTool(spec, apiKey)))
       : [];
 
+    const transcriber = buildTranscriberConfig(sector, { name: businessName });
+
     const res = await fetch(`https://api.vapi.ai/assistant/${body.assistantId}`, {
       method: 'PATCH',
       headers: {
@@ -170,6 +176,7 @@ export async function POST(request: Request) {
           ...(toolIds.length > 0 ? { toolIds } : {}),
         },
         voice: voicePatch,
+        transcriber,
         startSpeakingPlan,
         stopSpeakingPlan,
         metadata: mergedMetadata,

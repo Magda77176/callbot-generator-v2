@@ -3,6 +3,7 @@
 import Vapi from '@vapi-ai/web';
 import { Bot, Mic, MicOff, Phone, PhoneCall } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { VoiceWaveform } from './voice-waveform';
 
 type CallStatus = 'idle' | 'loading' | 'active' | 'ended' | 'error';
 
@@ -29,6 +30,7 @@ export function HomeDemoCall() {
   const [status, setStatus] = useState<CallStatus>('idle');
   const [bubbles, setBubbles] = useState<TranscriptBubble[]>([]);
   const [durationSec, setDurationSec] = useState(0);
+  const [volume, setVolume] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<{
     publicKey: string;
@@ -89,6 +91,10 @@ export function HomeDemoCall() {
               },
             ]);
           }
+        });
+        vapi.on('volume-level', (v: number) => {
+          // Vapi emits the assistant's speaking volume, 0..1.
+          setVolume(v);
         });
         vapi.on('error', (err: unknown) => {
           setError(err instanceof Error ? err.message : 'Erreur Vapi');
@@ -169,59 +175,73 @@ export function HomeDemoCall() {
       </div>
 
       {/* Body */}
-      <div className="p-5 min-h-[260px] flex flex-col">
-        {status === 'idle' && <IdlePlaceholder />}
-        {status === 'loading' && (
-          <div className="m-auto text-center space-y-3">
-            <div className="size-12 rounded-full bg-default/15 ring-1 ring-default/30 flex items-center justify-center mx-auto">
-              <PhoneCall className="size-5 text-default animate-pulse" />
+      <div className="min-h-[260px] flex flex-col">
+        {/* Waveform shows whenever the call is live or has just ended.
+            When idle/error it stays hidden to keep the static preview clean. */}
+        {(status === 'loading' || status === 'active' || status === 'ended') && (
+          <div className="border-b border-border bg-background/50 py-4">
+            <VoiceWaveform
+              volume={volume}
+              active={status === 'active'}
+              height={96}
+            />
+          </div>
+        )}
+
+        <div className="p-5 flex-1 flex flex-col">
+          {status === 'idle' && <IdlePlaceholder />}
+          {status === 'loading' && (
+            <div className="m-auto text-center space-y-3">
+              <div className="size-12 rounded-full bg-default/15 ring-1 ring-default/30 flex items-center justify-center mx-auto">
+                <PhoneCall className="size-5 text-default animate-pulse" />
+              </div>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                Connexion au bot…
+              </p>
             </div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">
-              Connexion au bot…
-            </p>
-          </div>
-        )}
-        {(status === 'active' || status === 'ended') && bubbles.length === 0 && (
-          <div className="m-auto text-center space-y-3">
-            <div className="size-12 rounded-full bg-default/15 ring-1 ring-default/30 flex items-center justify-center mx-auto">
-              <Mic className="size-5 text-default" />
+          )}
+          {(status === 'active' || status === 'ended') && bubbles.length === 0 && (
+            <div className="m-auto text-center space-y-3">
+              <div className="size-12 rounded-full bg-default/15 ring-1 ring-default/30 flex items-center justify-center mx-auto">
+                <Mic className="size-5 text-default" />
+              </div>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                Parlez maintenant
+              </p>
             </div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">
-              Parlez maintenant
-            </p>
-          </div>
-        )}
-        {bubbles.length > 0 && (
-          <div className="space-y-2 text-sm overflow-y-auto max-h-[300px] pr-1">
-            {bubbles.map((b, i) =>
-              b.role === 'user' ? (
-                <div key={i} className="flex gap-2 items-end">
-                  <div className="size-7 rounded-full bg-muted flex items-center justify-center shrink-0">
-                    <Phone className="size-3 text-muted-foreground" />
+          )}
+          {bubbles.length > 0 && (
+            <div className="space-y-2 text-sm overflow-y-auto max-h-[260px] pr-1">
+              {bubbles.map((b, i) =>
+                b.role === 'user' ? (
+                  <div key={i} className="flex gap-2 items-end">
+                    <div className="size-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <Phone className="size-3 text-muted-foreground" />
+                    </div>
+                    <div className="bg-muted rounded-2xl rounded-bl-sm px-3.5 py-2 max-w-[80%]">
+                      {b.text}
+                    </div>
                   </div>
-                  <div className="bg-muted rounded-2xl rounded-bl-sm px-3.5 py-2 max-w-[80%]">
-                    {b.text}
+                ) : (
+                  <div key={i} className="flex gap-2 items-end justify-end">
+                    <div className="bg-default/15 ring-1 ring-default/30 rounded-2xl rounded-br-sm px-3.5 py-2 max-w-[80%]">
+                      {b.text}
+                    </div>
+                    <div className="size-7 rounded-full bg-default/20 ring-1 ring-default/40 flex items-center justify-center shrink-0">
+                      <Bot className="size-3.5 text-default" />
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div key={i} className="flex gap-2 items-end justify-end">
-                  <div className="bg-default/15 ring-1 ring-default/30 rounded-2xl rounded-br-sm px-3.5 py-2 max-w-[80%]">
-                    {b.text}
-                  </div>
-                  <div className="size-7 rounded-full bg-default/20 ring-1 ring-default/40 flex items-center justify-center shrink-0">
-                    <Bot className="size-3.5 text-default" />
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        )}
-        {status === 'error' && error && (
-          <div className="m-auto text-center space-y-2">
-            <p className="text-xs uppercase tracking-widest text-red-400">Erreur démo</p>
-            <p className="text-xs text-muted-foreground font-mono">{error}</p>
-          </div>
-        )}
+                ),
+              )}
+            </div>
+          )}
+          {status === 'error' && error && (
+            <div className="m-auto text-center space-y-2">
+              <p className="text-xs uppercase tracking-widest text-red-400">Erreur démo</p>
+              <p className="text-xs text-muted-foreground font-mono">{error}</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer / controls */}

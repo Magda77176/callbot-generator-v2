@@ -4,6 +4,7 @@ import Vapi from '@vapi-ai/web';
 import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { VoiceWaveform } from '@/components/voice-waveform';
 import { cn } from '@/lib/utils';
 
 type CallStatus = 'idle' | 'loading' | 'active' | 'ended' | 'error';
@@ -33,6 +34,7 @@ export function VoiceTester({ assistantId }: VoiceTesterProps) {
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [currentSpeaker, setCurrentSpeaker] = useState<SpeakerRole>(null);
   const [durationSec, setDurationSec] = useState(0);
+  const [volume, setVolume] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -86,6 +88,10 @@ export function VoiceTester({ assistantId }: VoiceTesterProps) {
           }
         });
 
+        vapi.on('volume-level', (v: number) => {
+          setVolume(v);
+        });
+
         vapi.on('error', (err: unknown) => {
           const message = err instanceof Error ? err.message : 'Erreur Vapi';
           setError(message);
@@ -134,17 +140,23 @@ export function VoiceTester({ assistantId }: VoiceTesterProps) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="space-y-6">
         <div className="flex flex-col items-center gap-4 py-8">
-          <div
-            className={cn(
-              'w-32 h-32 rounded-full flex items-center justify-center text-5xl transition-all',
-              isActive && currentSpeaker === 'assistant' && 'bg-blue-500/20 ring-4 ring-blue-500 animate-pulse',
-              isActive && currentSpeaker === 'user' && 'bg-green-500/20 ring-4 ring-green-500',
-              isActive && currentSpeaker === null && 'bg-muted ring-2 ring-border',
-              !isActive && 'bg-muted',
-            )}
-          >
-            {isActive ? '🎙️' : '📞'}
-          </div>
+          {isActive ? (
+            <div className="w-full max-w-md">
+              <VoiceWaveform volume={volume} active={isActive} height={140} />
+            </div>
+          ) : (
+            <div
+              className={cn(
+                'w-32 h-32 rounded-full flex items-center justify-center text-5xl transition-all',
+                status === 'ended' && 'bg-muted ring-2 ring-border',
+                status === 'loading' && 'bg-default/15 ring-2 ring-default animate-pulse',
+                status === 'idle' && 'bg-muted',
+                status === 'error' && 'bg-destructive/15 ring-2 ring-destructive',
+              )}
+            >
+              {status === 'loading' ? '⏳' : status === 'ended' ? '✓' : '📞'}
+            </div>
+          )}
           {isActive ? (
             <Button variant="destructive" size="lg" onClick={handleStop}>
               🛑 Arrêter l&apos;appel

@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Mic } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
 import { PLANS, computeUsage, fmtEur, readMeta, type PlanId } from '@/lib/billing';
 import {
   fmtDate,
@@ -48,10 +49,20 @@ export default async function AssistantDetailPage({ params }: PageProps) {
         Retour aux assistants
       </Link>
 
-      <div>
-        <div className="uppercase text-xs tracking-widest text-default mb-3">— Assistant</div>
-        <h1 className="display-section">{assistant.name || '(sans nom)'}</h1>
-        <p className="text-muted-foreground mt-2 font-mono text-xs">{assistant.id}</p>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <div className="uppercase text-xs tracking-widest text-default mb-3">— Assistant</div>
+          <h1 className="display-section">{assistant.name || '(sans nom)'}</h1>
+          <p className="text-muted-foreground mt-2 font-mono text-xs">{assistant.id}</p>
+        </div>
+        <Link
+          href={`/test/${assistant.id}`}
+          target="_blank"
+          className={buttonVariants({ size: 'lg' }) + ' btn-elevated'}
+        >
+          <Mic className="size-4" />
+          Tester ce bot
+        </Link>
       </div>
 
       {/* Plan management */}

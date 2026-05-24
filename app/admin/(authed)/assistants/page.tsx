@@ -125,12 +125,22 @@ export default async function AssistantsPage() {
                     {fmtDate(lastCallAt)}
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Link
-                      href={`/admin/assistants/${assistant.id}`}
-                      className="text-xs uppercase tracking-widest text-default hover:underline"
-                    >
-                      Détail →
-                    </Link>
+                    <div className="flex items-center gap-3 justify-end">
+                      <Link
+                        href={`/test/${assistant.id}`}
+                        target="_blank"
+                        className="text-xs uppercase tracking-widest text-muted-foreground hover:text-default inline-flex items-center gap-1"
+                        title="Tester ce bot dans un nouvel onglet"
+                      >
+                        🎤 Test
+                      </Link>
+                      <Link
+                        href={`/admin/assistants/${assistant.id}`}
+                        className="text-xs uppercase tracking-widest text-default hover:underline"
+                      >
+                        Détail →
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

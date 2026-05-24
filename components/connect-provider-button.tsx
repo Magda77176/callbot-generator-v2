@@ -32,6 +32,12 @@ export function ConnectProviderButton({
         if (!res.ok || !json.success) {
           throw new Error(json.error || 'Échec de l\'initialisation');
         }
+        // If a connection already existed, the API stamped it directly on
+        // Vapi metadata — just refresh the page.
+        if (json.alreadyConnected) {
+          window.location.href = window.location.pathname + '?connect_status=success&provider=' + provider;
+          return;
+        }
         if (!json.redirectUrl) {
           throw new Error('Pas de redirectUrl renvoyée par Composio');
         }

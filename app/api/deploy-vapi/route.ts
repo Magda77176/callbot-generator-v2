@@ -79,6 +79,24 @@ interface DeployOverrides {
 }
 
 /**
+ * Vapi enforces a 40-character limit on assistant `name` and squad `name`.
+ * Truncate the business name portion to fit. We keep the role prefix intact
+ * because it's the operator-meaningful part (Qualifier vs Booker etc.).
+ */
+function fitVapiName(prefix: string, businessName: string): string {
+  const MAX = 40;
+  const sep = ' - ';
+  const full = `${prefix}${sep}${businessName}`;
+  if (full.length <= MAX) return full;
+  const allowedBiz = MAX - prefix.length - sep.length;
+  if (allowedBiz <= 0) {
+    // Pathological case (prefix alone >= 40 chars). Just truncate the whole thing.
+    return full.slice(0, MAX);
+  }
+  return `${prefix}${sep}${businessName.slice(0, allowedBiz)}`;
+}
+
+/**
  * Squad-mode deploy. Creates N specialised assistants (qualifier, proposer,
  * booker, closer for Alex) plus the handoff tools between them, then wraps
  * them in a Vapi squad via POST /squad. Returns the squadId and the first
@@ -151,7 +169,7 @@ async function deploySquadToVapi(
     // 4. Build the assistant payload. Shared voice / transcriber / speech
     //    pipeline across all members so the call sounds coherent.
     const payload: Record<string, unknown> = {
-      name: `${m.name} - ${businessName}`,
+      name: fitVapiName(m.name, businessName),
       ...(m.greeting
         ? { firstMessage: m.greeting.replace(/\{\{business_name\}\}/g, businessName) }
         : {}),
@@ -223,7 +241,11 @@ async function deploySquadToVapi(
   const orderedMemberIds = squad.members
     .map((m) => assistantIdByRole[m.role])
     .filter((id): id is string => Boolean(id));
-  const squadId = await createSquad(`${squad.nameTemplate} - ${businessName}`, orderedMemberIds, apiKey);
+  const squadId = await createSquad(
+    fitVapiName(squad.nameTemplate, businessName),
+    orderedMemberIds,
+    apiKey,
+  );
 
   // 6. Best-effort backfill of squadId into each member's metadata so admin
   //    pages can group them. Non-fatal if any patch fails.
@@ -322,7 +344,7 @@ async function deployToVapi(
   };
 
   const payload = {
-    name: `${config.name} - ${businessInfo.name || 'CallBot'}`,
+    name: fitVapiName(config.name, businessInfo.name || 'CallBot'),
     firstMessage: config.greeting.replace(/\{\{business_name\}\}/g, businessName),
     metadata: assistantMetadata,
     model: {

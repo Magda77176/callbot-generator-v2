@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/admin-auth';
-import { findActiveConnection, initiateConnection, PROVIDERS } from '@/lib/composio';
+import {
+  findActiveConnection,
+  initiateConnection,
+  PROVIDERS,
+  resolveComposioUserId,
+} from '@/lib/composio';
 
 // Body: { assistantId: string, provider: 'google_calendar' | ... }
 // Returns one of:
@@ -36,14 +41,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    // If a connection is already active on Composio for this assistantId +
+    // Squad-aware: if this assistant belongs to a squad, use squadId as the
+    // Composio userId so all members share one connection. Otherwise the
+    // assistantId itself.
+    const composioUserId = await resolveComposioUserId(assistantId);
+
+    // If a connection is already active on Composio for this userId +
     // toolkit, we don't re-run OAuth — we just stamp it on Vapi metadata.
-    // This handles the case where the user clicked Connect once before our
-    // callback was wired correctly (the connection got created on Composio
-    // but not stamped on Vapi), and also the case where the operator wants
-    // to re-link an assistant that was deleted in Vapi but still has a live
-    // Composio connection.
-    const existing = await findActiveConnection(assistantId, provider);
+    const existing = await findActiveConnection(composioUserId, provider);
     if (existing) {
       await patchVapiConnection(assistantId, provider, existing.id);
       return NextResponse.json({ success: true, alreadyConnected: true });
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
     const callbackUrl = `${origin}/api/composio/callback?assistantId=${encodeURIComponent(
       assistantId,
     )}&provider=${encodeURIComponent(provider)}`;
-    const res = await initiateConnection(assistantId, provider, callbackUrl);
+    const res = await initiateConnection(composioUserId, provider, callbackUrl);
     return NextResponse.json({ success: true, ...res });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur inconnue';

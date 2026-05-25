@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findActiveConnection } from '@/lib/composio';
+import { findActiveConnection, resolveComposioUserId } from '@/lib/composio';
 
 // Composio redirects here after the user approves the OAuth grant. Our
 // /initiate route encodes assistantId + provider in the callbackUrl, so we
@@ -22,14 +22,17 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Squad-aware: use squadId as the Composio userId if applicable.
+    const composioUserId = await resolveComposioUserId(assistantId);
+
     // Discover the connection that Composio just created for this user+toolkit.
     // We may need a tiny retry loop if Composio hasn't fully written the row
     // when it redirects us — usually it has, but we tolerate eventual
     // consistency.
-    let conn = await findActiveConnection(assistantId, provider);
+    let conn = await findActiveConnection(composioUserId, provider);
     if (!conn) {
       await new Promise((r) => setTimeout(r, 1000));
-      conn = await findActiveConnection(assistantId, provider);
+      conn = await findActiveConnection(composioUserId, provider);
     }
     if (!conn) {
       return NextResponse.redirect(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyVapiSecret } from '@/lib/verify-vapi-signature';
-import { executeAction } from '@/lib/composio';
+import { executeAction, resolveComposioUserId } from '@/lib/composio';
 
 // Webhook hit by Vapi every time the bot invokes one of the custom calendar
 // tools (check_calendar_availability or book_calendar_event). We use
@@ -20,6 +20,8 @@ interface VapiToolCall {
 interface VapiCallContext {
   id?: string;
   assistantId?: string;
+  squadId?: string;
+  assistant?: { id?: string; metadata?: Record<string, unknown> };
 }
 
 interface VapiMessage {
@@ -27,6 +29,10 @@ interface VapiMessage {
   toolCallList?: VapiToolCall[];
   toolCalls?: VapiToolCall[];
   call?: VapiCallContext;
+  // Vapi may also place these at top-level on some events (squad mode).
+  assistantId?: string;
+  squadId?: string;
+  assistant?: { id?: string; metadata?: Record<string, unknown> };
 }
 
 interface VapiWebhookPayload {
@@ -62,14 +68,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const assistantId = message?.call?.assistantId;
+  // Extract the active assistant id from various paths Vapi may use. Single-
+  // assistant mode puts it at message.call.assistantId. Squad mode sometimes
+  // puts it at message.call.assistant.id or top-level. We fall back through.
+  const assistantId =
+    message?.call?.assistantId ??
+    message?.call?.assistant?.id ??
+    message?.assistantId ??
+    message?.assistant?.id;
+
   if (!assistantId) {
-    return NextResponse.json({ error: 'missing assistantId' }, { status: 400 });
+    console.error('[tools/calendar] no assistantId in payload', JSON.stringify(payload).slice(0, 800));
+    return NextResponse.json({ error: 'missing assistantId in webhook payload' }, { status: 400 });
   }
+
+  // Resolve the Composio userId. For squad-deployed bots all members share
+  // the same squadId stamped in metadata — we use that as the userId so a
+  // single OAuth connection covers the whole squad. For single-assistant
+  // deploys we fall back to the assistantId.
+  const composioUserId = await resolveComposioUserId(assistantId);
 
   const calls = message?.toolCallList ?? message?.toolCalls ?? [];
   const results = await Promise.all(
-    calls.map((c) => handleToolCall(c, assistantId)),
+    calls.map((c) => handleToolCall(c, composioUserId)),
   );
   return NextResponse.json({ results });
 }

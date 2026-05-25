@@ -118,6 +118,30 @@ export async function initiateConnection(
 }
 
 /**
+ * Resolve the Composio userId for a given Vapi assistantId. Single-assistant
+ * deploys use the assistantId itself as the userId. Squad deploys stamp
+ * metadata.squadId on each member; we use that so all members of a squad
+ * share the same connected account (one OAuth flow covers the whole squad).
+ */
+export async function resolveComposioUserId(assistantId: string): Promise<string> {
+  const apiKey = process.env.VAPI_API_KEY?.trim();
+  if (!apiKey) return assistantId;
+  try {
+    const res = await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return assistantId;
+    const data = (await res.json()) as { metadata?: Record<string, unknown> };
+    const squadId =
+      typeof data.metadata?.squadId === 'string' ? (data.metadata.squadId as string) : undefined;
+    return squadId ?? assistantId;
+  } catch {
+    return assistantId;
+  }
+}
+
+/**
  * List active connections for a tenant + toolkit. Used by the callback route
  * to discover which connection was just created (Composio doesn't reliably
  * pass the connection id back in the callback query string).

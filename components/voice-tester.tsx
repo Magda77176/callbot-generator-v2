@@ -36,9 +36,26 @@ export function VoiceTester({ assistantId }: VoiceTesterProps) {
   const [durationSec, setDurationSec] = useState(0);
   const [volume, setVolume] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // If this assistant is part of a Vapi squad, we start the call with the
+  // squadId so handoffs work. We discover this on mount via /api/lookup-squad.
+  const [squadId, setSquadId] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Resolve squad membership early — non-blocking.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/lookup-squad?assistantId=${encodeURIComponent(assistantId)}`)
+      .then((r) => r.json())
+      .then((d: { squadId?: string | null }) => {
+        if (!cancelled && d.squadId) setSquadId(d.squadId);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [assistantId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +137,14 @@ export function VoiceTester({ assistantId }: VoiceTesterProps) {
     setDurationSec(0);
     setError(null);
     try {
-      await vapiRef.current.start(assistantId);
+      // Vapi SDK signature: start(assistant?, assistantOverrides?, squad?, ...)
+      // When this assistant is part of a squad, pass squadId as the 3rd arg so
+      // handoffs work. Otherwise standard single-assistant start.
+      if (squadId) {
+        await vapiRef.current.start(undefined, undefined, squadId);
+      } else {
+        await vapiRef.current.start(assistantId);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur de démarrage';
       setError(message);

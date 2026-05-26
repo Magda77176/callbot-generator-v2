@@ -272,18 +272,33 @@ export function buildToolsCalendarUrl(): string {
   );
 }
 
+export function currentDatetimeToolSpec(webhookUrl: string): VapiToolSpec {
+  return {
+    type: 'function',
+    function: {
+      name: 'get_current_datetime',
+      description:
+        "Renvoie la date et l'heure actuelles (Europe/Paris). À appeler UNE SEULE FOIS en début de conversation pour connaître la date du jour, le jour de la semaine, etc.",
+      parameters: { type: 'object', properties: {} },
+    },
+    server: { url: webhookUrl, secret: process.env.VAPI_WEBHOOK_SECRET?.trim() },
+  };
+}
+
 export function buildToolsForSector(sector: Sector, webhookUrl: string): VapiToolSpec[] {
+  const dateTool = currentDatetimeToolSpec(webhookUrl);
   switch (sector) {
     case 'restaurant':
-      return [reservationToolSpec(webhookUrl)];
+      return [dateTool, reservationToolSpec(webhookUrl)];
     case 'immobilier':
       return [
+        dateTool,
         leadToolSpec(webhookUrl),
         checkCalendarToolSpec(buildToolsCalendarUrl()),
         bookCalendarToolSpec(buildToolsCalendarUrl()),
       ];
     default:
-      return [];
+      return [dateTool];
   }
 }
 

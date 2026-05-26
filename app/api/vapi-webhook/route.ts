@@ -285,6 +285,24 @@ async function handleToolCall(
   const name = call.function?.name;
   const parsed = parseArgs(call.function?.arguments);
 
+  if (name === 'get_current_datetime') {
+    const now = new Date().toLocaleString('fr-FR', {
+      timeZone: 'Europe/Paris',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const isoDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
+    const dayOfWeek = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long' });
+    return {
+      toolCallId,
+      result: `Nous sommes le ${now}. Date ISO: ${isoDate}. Jour: ${dayOfWeek}.`,
+    };
+  }
+
   if (name === 'record_reservation') {
     const validated = validateReservation(parsed);
     if (!validated.ok) {

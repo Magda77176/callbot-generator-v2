@@ -386,7 +386,7 @@ export async function createSquad(
           assistantId: id,
           assistantOverrides: {
             firstMessage: greeting,
-            firstMessageMode: 'assistant-speaks-first' as const,
+            firstMessageMode: 'assistant-speaks-first-with-model-generated-message' as const,
           },
         };
       }

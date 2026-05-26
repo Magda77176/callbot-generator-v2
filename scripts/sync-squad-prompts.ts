@@ -34,10 +34,17 @@ async function listAssistants(): Promise<VapiAssistant[]> {
 }
 
 async function patchPrompt(id: string, systemPrompt: string): Promise<void> {
+  // GET first to preserve the existing model config (provider, model, toolIds…)
+  const getRes = await fetch(`${BASE}/assistant/${id}`, {
+    headers: { Authorization: `Bearer ${API_KEY}` },
+  });
+  if (!getRes.ok) throw new Error(`GET ${id}: ${getRes.status}`);
+  const existing = (await getRes.json()) as { model?: Record<string, unknown> };
+
   const res = await fetch(`${BASE}/assistant/${id}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: { systemPrompt } }),
+    body: JSON.stringify({ model: { ...existing.model, systemPrompt } }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

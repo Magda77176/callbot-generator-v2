@@ -31,6 +31,12 @@ export interface SquadMemberDef {
   name: string;
   /** Used only on the first member (the starting assistant). Empty otherwise. */
   greeting?: string;
+  /**
+   * Spoken immediately when this member takes over via handoff.
+   * Fills the 1-2s Vapi transfer latency so the caller doesn't hear silence.
+   * Set via assistantOverrides.firstMessage on the squad config.
+   */
+  handoffGreeting?: string;
   /** Role-focused system prompt. Will be prefixed by ALEX_SHARED_STYLE. */
   systemPrompt: string;
   /** Tools the member needs (in addition to handoff tools). */
@@ -368,6 +374,7 @@ export const ALEX_SQUAD: SquadConfig = {
     {
       role: 'proposer',
       name: 'Alex Proposer',
+      handoffGreeting: 'Voyons ce qu\'on a pour vous…',
       systemPrompt: ALEX_SHARED_STYLE + ALEX_PROPOSER_BODY,
       toolNames: [],
       handoffs: [
@@ -386,6 +393,7 @@ export const ALEX_SQUAD: SquadConfig = {
     {
       role: 'booker',
       name: 'Alex Booker',
+      handoffGreeting: 'Bien sûr, je regarde l\'agenda…',
       systemPrompt: ALEX_SHARED_STYLE + ALEX_BOOKER_BODY,
       toolNames: ['check_calendar_availability', 'book_calendar_event'],
       handoffs: [
@@ -399,6 +407,7 @@ export const ALEX_SQUAD: SquadConfig = {
     {
       role: 'closer',
       name: 'Alex Closer',
+      handoffGreeting: 'Très bien, je note tout ça…',
       systemPrompt: ALEX_SHARED_STYLE + ALEX_CLOSER_BODY,
       toolNames: ['record_lead'],
       handoffs: [],

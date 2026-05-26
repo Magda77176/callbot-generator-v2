@@ -375,10 +375,23 @@ export async function createSquad(
   name: string,
   memberAssistantIds: string[],
   apiKey: string,
+  handoffGreetings?: Record<string, string>,
 ): Promise<string> {
   const body = {
     name,
-    members: memberAssistantIds.map((id) => ({ assistantId: id })),
+    members: memberAssistantIds.map((id) => {
+      const greeting = handoffGreetings?.[id];
+      if (greeting) {
+        return {
+          assistantId: id,
+          assistantOverrides: {
+            firstMessage: greeting,
+            firstMessageMode: 'assistant-speaks-first' as const,
+          },
+        };
+      }
+      return { assistantId: id };
+    }),
   };
   const res = await fetch('https://api.vapi.ai/squad', {
     method: 'POST',

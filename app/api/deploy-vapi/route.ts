@@ -237,14 +237,24 @@ async function deploySquadToVapi(
   }
 
   // 5. Create the squad referencing all members in original order (first =
-  //    starting assistant = the qualifier)
+  //    starting assistant = the qualifier). Non-starter members get a
+  //    handoffGreeting that Vapi speaks immediately on transfer, filling
+  //    the 1-2s latency so the caller doesn't hear silence.
   const orderedMemberIds = squad.members
     .map((m) => assistantIdByRole[m.role])
     .filter((id): id is string => Boolean(id));
+  const handoffGreetings: Record<string, string> = {};
+  for (const m of squad.members) {
+    const id = assistantIdByRole[m.role];
+    if (id && m.handoffGreeting) {
+      handoffGreetings[id] = m.handoffGreeting;
+    }
+  }
   const squadId = await createSquad(
     fitVapiName(squad.nameTemplate, businessName),
     orderedMemberIds,
     apiKey,
+    handoffGreetings,
   );
 
   // 6. Best-effort backfill of squadId into each member's metadata so admin
